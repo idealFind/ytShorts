@@ -2,8 +2,9 @@ name: URL_Shorts
 
 on:
   workflow_dispatch:
+
   schedule:
-    - cron: '30 3 * * *'
+    - cron: '30 10 * * *'
 
 permissions:
   contents: write
@@ -71,6 +72,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
+
+      - name: Install fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-dejavu-core
 
       - name: Install Playwright Browsers
         run: |
