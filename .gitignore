@@ -1,0 +1,6 @@
+YouTubeUploaderClient.json
+/target/
+/shorts/
+*.mp4
+*.jpg
+*.png
