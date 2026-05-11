@@ -90,6 +90,7 @@ public class ytShorts {
 				page = context.newPage();
 
 				page.navigate(url, new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
+				page.waitForTimeout(5000);
 
 				// String pageTitle = page.locator("h1 span").last().textContent().trim();
 //				String pageTitle = page.locator("(//h1)[1]").innerText().trim();
@@ -115,6 +116,7 @@ public class ytShorts {
 //						+ "]//img[@alt]").all();
 
 				List<Locator> cards = page.locator("div.photos_cardposition__71WWM").all();
+				System.out.println("TOTAL CARDS: " + cards.size());
 
 				int downloadIndex = 1;
 
@@ -251,6 +253,12 @@ public class ytShorts {
 					}
 				}
 
+				if (videoIndex == 1) {
+
+					System.out.println("❌ No final images generated. Skipping video.");
+
+					continue;
+				}
 				Path audio = getRandomMusicFile();
 				System.out.println("🎵 Selected audio: " + audio.getFileName());
 
@@ -288,17 +296,38 @@ public class ytShorts {
 	}
 
 	private static void getPageTitle() {
-		if (page.locator("(//h1)[2]").count() > 0) {
 
-			pageTitle = page.locator("(//h1)[2]").innerText().trim();
+		try {
 
-		} else {
+			Locator h1Second = page.locator("(//h1)[2]");
 
-			pageTitle = page.locator("(//h1)[1]").innerText().trim();
+			if (h1Second.count() > 0) {
+
+				pageTitle = h1Second.first().innerText().trim();
+
+			} else {
+
+				pageTitle = page.locator("(//h1)[1]").first().innerText().trim();
+			}
+
+			// BAD TITLES FILTER
+			if (pageTitle == null || pageTitle.isBlank() || pageTitle.toLowerCase().contains("opt out")
+					|| pageTitle.toLowerCase().contains("privacy") || pageTitle.toLowerCase().contains("cookie")) {
+
+				pageTitle = "shorts_" + System.currentTimeMillis();
+			}
+
+			safeTitle = sanitizeForFolderName(pageTitle);
+
+			System.out.println("PAGE TITLE: " + pageTitle);
+			System.out.println("SAFE TITLE: " + safeTitle);
+
+		} catch (Exception e) {
+
+			pageTitle = "shorts_" + System.currentTimeMillis();
+
+			safeTitle = sanitizeForFolderName(pageTitle);
 		}
-
-		safeTitle = sanitizeForFolderName(pageTitle);
-		System.out.println("PAGE (SAFETITLE) : " + safeTitle);
 	}
 
 	private static String extractPlainText(String rawTag) {
