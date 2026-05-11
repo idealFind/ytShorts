@@ -15,7 +15,7 @@ import com.google.api.services.youtube.model.VideoSnippet;
 import com.google.api.services.youtube.model.VideoStatus;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.WaitUntilState;
-import java.nio.file.Path;
+
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -31,25 +31,14 @@ public class ytVideos {
 	// ================= CONFIG =================
 	private static final String IMAGE_PREFIX = "img";
 
-	private static final int TARGET_WIDTH = 1920;
-	private static final int TARGET_HEIGHT = 1080;
-
 	private static final int MAX_CHARS_PER_LINE = 55;
 	private static final int FONT_SIZE = 32; // 30
 	private static final int LINE_HEIGHT = 40; // 56
-	private static final int START_Y = 900; // 50
-
-	private static final double SECONDS_PER_IMAGE = 3.2;
-	private static final int FPS = 24;
-
 	public static String pageTitle;
 	public static Page page;
 	public static String safeTitle;
 
-	private static final String TTS_VOICE = "Microsoft Ravi";
-
-	private static final Path MUSIC_DIR = Paths
-			.get("C:\\Users\\sunny\\Documents\\eclipse-workspace\\ImagesPlayWright\\music");
+	private static final Path MUSIC_DIR = Paths.get("music");
 
 	private static final Random RANDOM = new Random();
 	private static final String APPLICATION_NAME = "YouTubeUploaderClient";
@@ -599,11 +588,18 @@ public class ytVideos {
 
 		Graphics2D g = img.createGraphics();
 
+		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
 		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-		g.setFont(new Font("SansSerif", Font.BOLD, FONT_SIZE));
+		g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 
-		List<String> lines = wrapText(text);
+		// g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+		// RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+		g.setFont(new Font("DejaVu Sans", Font.BOLD, FONT_SIZE));
+
+		List<String> lines = wrapText(g, text, img.getWidth() - 120);
 
 		FontMetrics fm = g.getFontMetrics();
 
@@ -614,11 +610,12 @@ public class ytVideos {
 
 			int w = fm.stringWidth(line);
 
-			int x = (img.getWidth() - w) / 2;
+			int x = Math.max(40, (img.getWidth() - w) / 2);
 
 			g.setColor(new Color(0, 0, 0, 180));
 
-			g.fillRoundRect(x - 20, y - fm.getAscent(), w + 40, fm.getHeight(), 20, 20);
+			// g.fillRoundRect(x - 20, y - fm.getAscent(), w + 40, fm.getHeight(), 20, 20);
+			g.fillRoundRect(x - 25, y - fm.getAscent() - 10, w + 50, fm.getHeight() + 20, 25, 25);
 
 			g.setColor(Color.WHITE);
 
@@ -634,25 +631,50 @@ public class ytVideos {
 		return true;
 	}
 
-	private static List<String> wrapText(String text) {
-		List<String> lines = new ArrayList<>();
-		if (text == null)
-			return lines;
+	private static List<String> wrapText(Graphics2D g, String text, int maxWidth) {
 
-		StringBuilder sb = new StringBuilder();
-		for (String w : text.split("\\s+")) {
-			if (sb.length() + w.length() <= MAX_CHARS_PER_LINE) {
-				if (sb.length() > 0)
-					sb.append(" ");
-				sb.append(w);
+		List<String> lines = new ArrayList<>();
+
+		if (text == null || text.isBlank()) {
+			return lines;
+		}
+
+		FontMetrics fm = g.getFontMetrics();
+
+		String[] words = text.split("\\s+");
+
+		StringBuilder line = new StringBuilder();
+
+		for (String word : words) {
+
+			String testLine;
+
+			if (line.length() == 0) {
+				testLine = word;
 			} else {
-				lines.add(sb.toString());
-				sb.setLength(0);
-				sb.append(w);
+				testLine = line + " " + word;
+			}
+
+			int width = fm.stringWidth(testLine);
+
+			if (width <= maxWidth) {
+
+				line = new StringBuilder(testLine);
+
+			} else {
+
+				if (line.length() > 0) {
+					lines.add(line.toString());
+				}
+
+				line = new StringBuilder(word);
 			}
 		}
-		if (sb.length() > 0)
-			lines.add(sb.toString());
+
+		if (line.length() > 0) {
+			lines.add(line.toString());
+		}
+
 		return lines;
 	}
 

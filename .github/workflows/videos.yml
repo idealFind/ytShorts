@@ -1,4 +1,4 @@
-name: Shorts Automation
+name: Videos Automation
 
 on:
   workflow_dispatch:
@@ -45,4 +45,4 @@ jobs:
       - name: Run Shorts Automation
         run: |
           mvn exec:java \
-          -Dexec.mainClass="yt.ytShorts"
+          -Dexec.mainClass="yt.ytVideos"
