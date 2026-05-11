@@ -1,4 +1,4 @@
-name: Daily Shorts Automation
+name: URL_Shorts
 
 on:
   workflow_dispatch:
