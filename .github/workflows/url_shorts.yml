@@ -5,8 +5,13 @@ on:
   schedule:
     - cron: '30 3 * * *'
 
+permissions:
+  contents: write
+
 jobs:
-  build:
+
+  update-urls:
+
     runs-on: ubuntu-latest
 
     steps:
@@ -20,8 +25,47 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Maven
-        run: mvn -version
+      - name: Install Playwright Browsers
+        run: |
+          mvn exec:java \
+          -Dexec.mainClass=com.microsoft.playwright.CLI \
+          -Dexec.args="install"
+
+      - name: Build Project
+        run: mvn clean compile
+
+      - name: Run URL Scraper
+        run: |
+          mvn exec:java \
+          -Dexec.mainClass="yt.MidDayTest"
+
+      - name: Commit Updated urls.txt
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+          git add urls.txt
+
+          git diff --cached --quiet || git commit -m "Auto updated urls.txt"
+
+          git push
+
+  generate-shorts:
+
+    needs: update-urls
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
       - name: Install FFmpeg
         run: |
@@ -41,3 +85,9 @@ jobs:
         run: |
           mvn exec:java \
           -Dexec.mainClass="yt.ytShorts"
+
+      - name: Upload Generated Videos
+        uses: actions/upload-artifact@v4
+        with:
+          name: shorts-output
+          path: shorts/
