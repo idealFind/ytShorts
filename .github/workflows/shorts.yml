@@ -1,48 +1,23 @@
 name: Daily Shorts Automation
 
 on:
-schedule:
-- cron: '0 4 * * *'
-workflow_dispatch:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 3 * * *'
 
 jobs:
-build:
-runs-on: ubuntu-latest
+  build:
+    runs-on: ubuntu-latest
 
-steps:
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
 
-  - name: Checkout Repository
-    uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-  - name: Setup Java
-    uses: actions/setup-java@v4
-    with:
-      distribution: temurin
-      java-version: 21
-
-  - name: Setup Node.js
-    uses: actions/setup-node@v4
-    with:
-      node-version: 20
-
-  - name: Install FFmpeg
-    run: |
-      sudo apt-get update
-      sudo apt-get install -y ffmpeg
-
-  - name: Install Playwright Browsers
-    run: |
-      npm install playwright
-      npx playwright install --with-deps
-
-  - name: Verify Installations
-    run: |
-      java -version
-      ffmpeg -version
-      npx playwright --version
-
-  - name: Build Project
-    run: mvn clean package
-
-  - name: Run Shorts Generator
-    run: mvn exec:java -Dexec.mainClass="yt.ImageUrlExtractorWithVideo2"
+      - name: Test
+        run: echo "Workflow working"
