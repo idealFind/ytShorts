@@ -31,7 +31,7 @@ public class ytVideos {
 	// ================= CONFIG =================
 	private static final String IMAGE_PREFIX = "img";
 
-	private static final int MAX_CHARS_PER_LINE = 55;
+	// private static final int MAX_CHARS_PER_LINE = 55;
 	private static final int FONT_SIZE = 32; // 30
 	private static final int LINE_HEIGHT = 40; // 56
 	public static String pageTitle;
@@ -267,11 +267,27 @@ public class ytVideos {
 
 								"-t", String.valueOf(audioDuration),
 
-								"-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-c:v", "libx264",
+								"-filter_complex",
 
-								"-preset", "ultrafast",
+								// ===== BACKGROUND BLUR =====
+								"[0:v]scale=1920:1080:force_original_aspect_ratio=increase," + "crop=1920:1080,"
+										+ "boxblur=20:10[bg];"
 
-								"-tune", "stillimage",
+										// ===== MAIN IMAGE =====
+										+ "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease[fg];"
+
+										// ===== OVERLAY CENTER =====
+										+ "[bg][fg]overlay=(W-w)/2:(H-h)/2,"
+
+										// ===== SLOW ZOOM EFFECT =====
+										+ "zoompan=z='min(zoom+0.0005,1.08)':" + "d=125:" + "x='iw/2-(iw/zoom/2)':"
+										+ "y='ih/2-(ih/zoom/2)':" + "s=1920x1080:fps=24",
+
+								"-c:v", "libx264",
+
+								"-preset", "medium",
+
+								"-crf", "22",
 
 								"-pix_fmt", "yuv420p",
 
@@ -281,9 +297,9 @@ public class ytVideos {
 
 								"-shortest",
 
-								videoSegment.toString()),
+								videoSegment.toString()
 
-								"Fast Segment");
+						), "Cinematic Segment");
 
 						// ✅ THEN CHECK
 						if (!Files.exists(videoSegment)) {
