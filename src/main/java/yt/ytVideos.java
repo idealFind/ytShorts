@@ -78,15 +78,37 @@ public class ytVideos {
 				safeTitle = sanitizeForFolderName(pageTitle);
 				System.out.println("safeTitle --> " + safeTitle);
 
-				Path baseDir = Paths.get(safeTitle);
+				//
+				// ROOT VIDEOS FOLDER
+				//
+				Path videosRoot = Paths.get("videos");
+
+				//
+				// TITLE FOLDER INSIDE videos/
+				//
+				Path baseDir = videosRoot.resolve(safeTitle);
+				System.out.println("VIDEO DIRECTORY: " + baseDir.toAbsolutePath());
+
+				//
+				// SUBFOLDERS
+				//
 				Path downloadDir = baseDir.resolve("downloaded_images");
-				// Path resizedDir = baseDir.resolve("resized_images");
+
 				Path finalDir = baseDir.resolve("final_images_with_text");
+
 				Path segmentsDir = baseDir.resolve("video_segments");
 
+				//
+				// CREATE DIRECTORIES
+				//
+				Files.createDirectories(videosRoot);
+
+				Files.createDirectories(baseDir);
+
 				Files.createDirectories(downloadDir);
-				// Files.createDirectories(resizedDir);
+
 				Files.createDirectories(finalDir);
+
 				Files.createDirectories(segmentsDir);
 
 				// List<Locator> images =
@@ -269,25 +291,24 @@ public class ytVideos {
 
 								"-filter_complex",
 
-								// ===== BACKGROUND BLUR =====
+								// ===== BLURRED BACKGROUND =====
 								"[0:v]scale=1920:1080:force_original_aspect_ratio=increase," + "crop=1920:1080,"
-										+ "boxblur=20:10[bg];"
+										+ "gblur=sigma=25[bg];"
 
-										// ===== MAIN IMAGE =====
+										// ===== FOREGROUND IMAGE =====
 										+ "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease[fg];"
 
-										// ===== OVERLAY CENTER =====
-										+ "[bg][fg]overlay=(W-w)/2:(H-h)/2,"
-
-										// ===== SLOW ZOOM EFFECT =====
-										+ "zoompan=z='min(zoom+0.0005,1.08)':" + "d=125:" + "x='iw/2-(iw/zoom/2)':"
-										+ "y='ih/2-(ih/zoom/2)':" + "s=1920x1080:fps=24",
+										// ===== CENTER IMAGE =====
+										+ "[bg][fg]overlay=(W-w)/2:(H-h)/2",
 
 								"-c:v", "libx264",
 
-								"-preset", "medium",
+								// medium for slightly medium quality
+								"-preset", "medium", "-crf", "22",
 
-								"-crf", "22",
+								// slow for high quality
+								// "-preset", "slow",
+								// "-crf", "18",
 
 								"-pix_fmt", "yuv420p",
 
@@ -739,30 +760,99 @@ public class ytVideos {
 		return files.get(RANDOM.nextInt(files.size()));
 	}
 
+//	private static boolean generateTTS(String text, Path outputPath) {
+//		try {
+//			if (text == null || text.isBlank()) {
+//				text = "Hello";
+//			}
+//
+//			text = text.replace("\"", "").replace("'", "");
+//
+//			String voice = "en-IN-NeerjaNeural";
+//
+//			ProcessBuilder pb = new ProcessBuilder("cmd", "/c", "edge-tts --voice " + voice + " --text \"" + text + "\""
+//					+ " --write-media \"" + outputPath.toAbsolutePath() + "\"");
+//
+//			pb.inheritIO();
+//			Process process = pb.start();
+//
+//			int exitCode = process.waitFor();
+//
+//			// ✅ VERY IMPORTANT CHECK
+//			if (exitCode == 0 && Files.exists(outputPath) && Files.size(outputPath) > 1000) {
+//				return true;
+//			}
+//
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//		}
+//
+//		return false;
+//	}
+
 	private static boolean generateTTS(String text, Path outputPath) {
+
 		try {
+
 			if (text == null || text.isBlank()) {
 				text = "Hello";
 			}
 
-			text = text.replace("\"", "").replace("'", "");
+			// CLEAN TEXT
+			text = text.replace("\"", "").replace("'", "").replace("\n", " ").replace("\r", " ").trim();
+
+			// LIMIT VERY LONG TEXT
+			if (text.length() > 300) {
+				text = text.substring(0, 300);
+			}
 
 			String voice = "en-IN-NeerjaNeural";
 
-			ProcessBuilder pb = new ProcessBuilder("cmd", "/c", "edge-tts --voice " + voice + " --text \"" + text + "\""
-					+ " --write-media \"" + outputPath.toAbsolutePath() + "\"");
+			List<String> command = new ArrayList<>();
 
-			pb.inheritIO();
+			System.out.println("Running TTS: " + command);
+
+			// command.add("edge-tts");
+			command.add("python3");
+			command.add("-m");
+			command.add("edge_tts");
+
+			command.add("--voice");
+			command.add(voice);
+
+			command.add("--text");
+			command.add(text);
+
+			command.add("--write-media");
+			command.add(outputPath.toAbsolutePath().toString());
+
+			ProcessBuilder pb = new ProcessBuilder(command);
+
+			pb.redirectErrorStream(true);
+
 			Process process = pb.start();
+
+			BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+			String line;
+
+			while ((line = reader.readLine()) != null) {
+				System.out.println(line);
+			}
 
 			int exitCode = process.waitFor();
 
-			// ✅ VERY IMPORTANT CHECK
 			if (exitCode == 0 && Files.exists(outputPath) && Files.size(outputPath) > 1000) {
+
+				System.out.println("✅ TTS CREATED: " + outputPath);
+
 				return true;
 			}
 
+			System.out.println("❌ TTS FAILED");
+
 		} catch (Exception e) {
+
 			e.printStackTrace();
 		}
 
