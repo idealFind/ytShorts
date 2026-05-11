@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout Repo
         uses: actions/checkout@v4
 
@@ -19,5 +20,24 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Test
-        run: echo "Workflow working"
+      - name: Setup Maven
+        run: mvn -version
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install Playwright Browsers
+        run: |
+          mvn exec:java \
+          -Dexec.mainClass=com.microsoft.playwright.CLI \
+          -Dexec.args="install"
+
+      - name: Build Project
+        run: mvn clean compile
+
+      - name: Run Shorts Automation
+        run: |
+          mvn exec:java \
+          -Dexec.mainClass="yt.ytShorts"
