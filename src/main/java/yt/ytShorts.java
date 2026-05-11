@@ -432,7 +432,7 @@ public class ytShorts {
 			videoObject.setSnippet(snippet);
 
 			VideoStatus status = new VideoStatus();
-			status.setPrivacyStatus("private"); // change to private / public if needed
+			status.setPrivacyStatus("public"); // change to private / public if needed
 			videoObject.setStatus(status);
 
 			InputStreamContent mediaContent = new InputStreamContent("video/*", new FileInputStream(videoFile));

@@ -489,7 +489,7 @@ public class ytVideos {
 			video.setSnippet(snippet);
 
 			VideoStatus status = new VideoStatus();
-			status.setPrivacyStatus("public");
+			status.setPrivacyStatus("private");
 			video.setStatus(status);
 
 			InputStreamContent mediaContent = new InputStreamContent("video/*", new FileInputStream(videoFile));
