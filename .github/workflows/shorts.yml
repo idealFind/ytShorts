@@ -9,7 +9,6 @@ jobs:
 build:
 runs-on: ubuntu-latest
 
-```
 steps:
 
   - name: Checkout Repository
@@ -47,4 +46,3 @@ steps:
 
   - name: Run Shorts Generator
     run: mvn exec:java -Dexec.mainClass="yt.ImageUrlExtractorWithVideo2"
-```
