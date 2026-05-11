@@ -517,15 +517,15 @@ public class ytShorts {
 
 		BufferedImage img = ImageIO.read(in.toFile());
 		Graphics2D g = img.createGraphics();
-		g.setFont(new Font("SansSerif", Font.BOLD, FONT_SIZE));
+		g.setFont(new Font("DejaVu Sans", Font.BOLD, FONT_SIZE));
 
-		List<String> lines = wrapText(text);
+		List<String> lines = wrapText(g, text, 900);
 		FontMetrics fm = g.getFontMetrics();
 		int y = START_Y;
 
 		for (String line : lines) {
 			int w = fm.stringWidth(line);
-			int x = (img.getWidth() - w) / 2;
+			int x = Math.max(40, (img.getWidth() - w) / 2);
 
 			g.setColor(new Color(0, 0, 0, 180));
 			g.fillRoundRect(x - 20, y - fm.getAscent(), w + 40, fm.getHeight(), 20, 20);
@@ -540,25 +540,38 @@ public class ytShorts {
 		return true;
 	}
 
-	private static List<String> wrapText(String text) {
-		List<String> lines = new ArrayList<>();
-		if (text == null)
-			return lines;
+	private static List<String> wrapText(Graphics2D g, String text, int maxWidth) {
 
-		StringBuilder sb = new StringBuilder();
-		for (String w : text.split("\\s+")) {
-			if (sb.length() + w.length() <= MAX_CHARS_PER_LINE) {
-				if (sb.length() > 0)
-					sb.append(" ");
-				sb.append(w);
+		List<String> lines = new ArrayList<>();
+
+		FontMetrics fm = g.getFontMetrics();
+
+		String[] words = text.split("\\s+");
+
+		StringBuilder line = new StringBuilder();
+
+		for (String word : words) {
+
+			String testLine = line.length() == 0 ? word : line + " " + word;
+
+			int width = fm.stringWidth(testLine);
+
+			if (width < maxWidth) {
+
+				line = new StringBuilder(testLine);
+
 			} else {
-				lines.add(sb.toString());
-				sb.setLength(0);
-				sb.append(w);
+
+				lines.add(line.toString());
+
+				line = new StringBuilder(word);
 			}
 		}
-		if (sb.length() > 0)
-			lines.add(sb.toString());
+
+		if (line.length() > 0) {
+			lines.add(line.toString());
+		}
+
 		return lines;
 	}
 

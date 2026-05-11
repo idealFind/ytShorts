@@ -80,6 +80,7 @@ public class ytVideos {
 				page = context.newPage();
 
 				page.navigate(url, new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
+				page.waitForTimeout(4000);
 
 				// pageTitle = page.locator("(//section//b)[1]").innerText();
 				// pageTitle = page.locator("(//h1)[2]").innerText().trim();

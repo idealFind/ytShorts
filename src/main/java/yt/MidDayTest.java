@@ -1,4 +1,5 @@
 package yt;
+
 import com.microsoft.playwright.*;
 import java.nio.file.*;
 import java.io.IOException;
@@ -37,6 +38,7 @@ public class MidDayTest {
 				System.out.println("\nOPENING CATEGORY: " + url);
 
 				page.navigate(url);
+				page.waitForTimeout(4000);
 
 				Locator blocks = page.locator("div.border-bottom.pb-3.mb-3, div.row.desktop-border.mb-4");
 
