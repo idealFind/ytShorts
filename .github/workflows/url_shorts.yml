@@ -3,8 +3,9 @@ name: URL_Shorts
 on:
   workflow_dispatch:
 
-  #schedule:
+  schedule:
    # - cron: '30 11 * * *'
+   - cron: '30 15 * * *'
 
 permissions:
   contents: write
