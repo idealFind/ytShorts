@@ -4,13 +4,12 @@ on:
   workflow_dispatch:
 
   schedule:
-    - cron: '32 21 * * *'
+    - cron: '11 16 * * *'
 
 permissions:
   contents: write
 
 jobs:
-
   update-urls:
 
     runs-on: ubuntu-latest
