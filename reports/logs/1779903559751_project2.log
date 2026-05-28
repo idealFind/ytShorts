@@ -1,0 +1,40 @@
+com.google.api.client.googleapis.json.GoogleJsonResponseException: 429 Too Many Requests
+POST https://www.googleapis.com/upload/youtube/v3/videos?part=snippet,status&uploadType=resumable
+{
+  "code" : 429,
+  "errors" : [ {
+    "domain" : "global",
+    "message" : "Quota exceeded for quota metric 'Video Uploads' and limit 'Video Uploads per day' of service 'youtube.googleapis.com' for consumer 'project_number:682638514178'.",
+    "reason" : "rateLimitExceeded"
+  } ],
+  "message" : "Quota exceeded for quota metric 'Video Uploads' and limit 'Video Uploads per day' of service 'youtube.googleapis.com' for consumer 'project_number:682638514178'.",
+  "status" : "RESOURCE_EXHAUSTED",
+  "details" : [ {
+    "@type" : "type.googleapis.com/google.rpc.ErrorInfo",
+    "reason" : "RATE_LIMIT_EXCEEDED",
+    "domain" : "googleapis.com",
+    "metadata" : {
+      "service" : "youtube.googleapis.com",
+      "quota_location" : "global",
+      "quota_limit_value" : "6",
+      "quota_unit" : "1/d/{project}",
+      "consumer" : "projects/682638514178",
+      "quota_limit" : "defaultVideoInsertPerDayPerProject",
+      "quota_metric" : "youtube.googleapis.com/video_insert"
+    }
+  }, {
+    "@type" : "type.googleapis.com/google.rpc.Help",
+    "links" : [ {
+      "description" : "Request a higher quota limit.",
+      "url" : "https://cloud.google.com/docs/quotas/help/request_increase"
+    } ]
+  } ]
+}
+	at com.google.api.client.googleapis.json.GoogleJsonResponseException.from(GoogleJsonResponseException.java:150)
+	at com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest.newExceptionOnError(AbstractGoogleJsonClientRequest.java:113)
+	at com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest.newExceptionOnError(AbstractGoogleJsonClientRequest.java:40)
+	at com.google.api.client.googleapis.services.AbstractGoogleClientRequest.executeUnparsed(AbstractGoogleClientRequest.java:432)
+	at com.google.api.client.googleapis.services.AbstractGoogleClientRequest.executeUnparsed(AbstractGoogleClientRequest.java:352)
+	at com.google.api.client.googleapis.services.AbstractGoogleClientRequest.execute(AbstractGoogleClientRequest.java:469)
+	at yt.ytVideos.uploadToYouTube(ytVideos.java:683)
+	at yt.ytVideos.main(ytVideos.java:486)

@@ -1,0 +1,43 @@
+com.google.api.client.googleapis.json.GoogleJsonResponseException: 403 Forbidden
+POST https://www.googleapis.com/upload/youtube/v3/videos?part=snippet,status&uploadType=resumable
+{
+  "code" : 403,
+  "errors" : [ {
+    "domain" : "usageLimits",
+    "message" : "YouTube Data API v3 has not been used in project 400963434401 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/youtube.googleapis.com/overview?project=400963434401 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.",
+    "reason" : "accessNotConfigured",
+    "extendedHelp" : "https://console.developers.google.com"
+  } ],
+  "message" : "YouTube Data API v3 has not been used in project 400963434401 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/youtube.googleapis.com/overview?project=400963434401 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.",
+  "status" : "PERMISSION_DENIED",
+  "details" : [ {
+    "@type" : "type.googleapis.com/google.rpc.ErrorInfo",
+    "reason" : "SERVICE_DISABLED",
+    "domain" : "googleapis.com",
+    "metadata" : {
+      "consumer" : "projects/400963434401",
+      "serviceTitle" : "YouTube Data API v3",
+      "activationUrl" : "https://console.developers.google.com/apis/api/youtube.googleapis.com/overview?project=400963434401",
+      "containerInfo" : "400963434401",
+      "service" : "youtube.googleapis.com"
+    }
+  }, {
+    "@type" : "type.googleapis.com/google.rpc.LocalizedMessage",
+    "locale" : "en-US",
+    "message" : "YouTube Data API v3 has not been used in project 400963434401 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/youtube.googleapis.com/overview?project=400963434401 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."
+  }, {
+    "@type" : "type.googleapis.com/google.rpc.Help",
+    "links" : [ {
+      "description" : "Google developers console API activation",
+      "url" : "https://console.developers.google.com/apis/api/youtube.googleapis.com/overview?project=400963434401"
+    } ]
+  } ]
+}
+	at com.google.api.client.googleapis.json.GoogleJsonResponseException.from(GoogleJsonResponseException.java:150)
+	at com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest.newExceptionOnError(AbstractGoogleJsonClientRequest.java:113)
+	at com.google.api.client.googleapis.services.json.AbstractGoogleJsonClientRequest.newExceptionOnError(AbstractGoogleJsonClientRequest.java:40)
+	at com.google.api.client.googleapis.services.AbstractGoogleClientRequest.executeUnparsed(AbstractGoogleClientRequest.java:432)
+	at com.google.api.client.googleapis.services.AbstractGoogleClientRequest.executeUnparsed(AbstractGoogleClientRequest.java:352)
+	at com.google.api.client.googleapis.services.AbstractGoogleClientRequest.execute(AbstractGoogleClientRequest.java:469)
+	at yt.ytVideos.uploadToYouTube(ytVideos.java:683)
+	at yt.ytVideos.main(ytVideos.java:486)

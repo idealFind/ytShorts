@@ -1,6 +1,8 @@
 package yt;
 
 import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
 import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
@@ -405,46 +407,103 @@ public class ytShorts {
 		return text;
 	}
 
-	private static void Upload(File videoFile) { // ✅ UPDATED
-		try {
-			Credential credential = authorize();
+	private static void Upload(File videoFile) {
 
-			YouTube youtube = new YouTube.Builder(GoogleNetHttpTransport.newTrustedTransport(),
-					JacksonFactory.getDefaultInstance(), credential).setApplicationName(APPLICATION_NAME).build();
+		List<String> projects = Arrays.asList("project1", "project2", "project3", "project4", "project5");
 
-			Video videoObject = new Video();
+		boolean uploaded = false;
 
-			VideoSnippet snippet = new VideoSnippet();
+		for (String project : projects) {
 
-			String fullTitle = cleanText(safeTitle) + " #shorts #shortvideo";
-			String finalTitle = fullTitle.length() > 100 ? fullTitle.substring(0, 100) : fullTitle;
-			snippet.setTitle(finalTitle);
+			try {
 
-			// String finalDesc = allCaptions + "\n" + descriptionDefault;
-			String finalDesc = cleanText(safeTitle) + "\n\n" + cleanText(allCaptions) + "\n";
-			finalDesc = finalDesc.length() > 5000 ? finalDesc.substring(0, 5000) : finalDesc;
-			snippet.setDescription(finalDesc);
+				System.out.println("\n=================================");
+				System.out.println("TRYING PROJECT: " + project);
+				System.out.println("=================================");
 
-			split_word_add_Hashtag();
-			System.out.print("\n\nsplit_word_add_Hashtag post function: \n\t" + finalOutput);
-			snippet.setTags(Collections.singletonList(finalOutput
-					+ "#Shorts,#YouTubeShorts,#ViralMoments,#TrendingShorts,#CelebrityFashion,#RedCarpetStyle,#CelebrityLook,#FashionMoment,#PopCulture,#EntertainmentNews,#ModelStyle,#CelebrityStyle,#ViralVideo,#HollywoodBuzz,#StyleInspo,#bollywood,#bollywoodfashion,#dress,#celebsdress,#celebslook,#shortvideo, #cricket, #ipl2026, #news, #politics"));
-			videoObject.setSnippet(snippet);
+				Credential credential = authorize(project);
 
-			VideoStatus status = new VideoStatus();
-			status.setPrivacyStatus("public"); // change to private / public if needed
-			videoObject.setStatus(status);
+				YouTube youtube = new YouTube.Builder(GoogleNetHttpTransport.newTrustedTransport(),
+						JacksonFactory.getDefaultInstance(), credential).setApplicationName(APPLICATION_NAME).build();
 
-			InputStreamContent mediaContent = new InputStreamContent("video/*", new FileInputStream(videoFile));
+				Video videoObject = new Video();
 
-			YouTube.Videos.Insert videoInsert = youtube.videos().insert("snippet,status", videoObject, mediaContent);
+				VideoSnippet snippet = new VideoSnippet();
 
-			Video returnedVideo = videoInsert.execute();
+				String fullTitle = cleanText(safeTitle) + " #shorts #shortvideo";
 
-			System.out.println("✅ Uploaded: https://youtube.com/watch?v=" + returnedVideo.getId());
+				String finalTitle = fullTitle.length() > 100 ? fullTitle.substring(0, 100) : fullTitle;
 
-		} catch (Exception e) {
-			e.printStackTrace();
+				snippet.setTitle(finalTitle);
+
+				String finalDesc = cleanText(safeTitle) + "\n\n" + cleanText(allCaptions) + "\n";
+
+				finalDesc = finalDesc.length() > 5000 ? finalDesc.substring(0, 5000) : finalDesc;
+
+				snippet.setDescription(finalDesc);
+
+				split_word_add_Hashtag();
+
+				snippet.setTags(Collections.singletonList(finalOutput + "#Shorts,#YouTubeShorts,"
+						+ "#ViralMoments,#TrendingShorts," + "#CelebrityFashion,#RedCarpetStyle,"
+						+ "#CelebrityLook,#FashionMoment," + "#PopCulture,#EntertainmentNews,"
+						+ "#ModelStyle,#CelebrityStyle," + "#ViralVideo,#HollywoodBuzz," + "#StyleInspo,#bollywood,"
+						+ "#bollywoodfashion,#dress," + "#celebsdress,#celebslook," + "#shortvideo,#cricket,"
+						+ "#ipl2026,#news,#politics"));
+
+				videoObject.setSnippet(snippet);
+
+				VideoStatus status = new VideoStatus();
+				status.setPrivacyStatus("public");
+
+				videoObject.setStatus(status);
+
+				InputStreamContent mediaContent = new InputStreamContent("video/*", new FileInputStream(videoFile));
+
+				YouTube.Videos.Insert videoInsert = youtube.videos().insert("snippet,status", videoObject,
+						mediaContent);
+
+				Video returnedVideo = videoInsert.execute();
+
+				System.out.println(
+						"✅ Uploaded using " + project + ": https://youtube.com/watch?v=" + returnedVideo.getId());
+
+				uploaded = true;
+				break;
+
+			} catch (GoogleJsonResponseException e) {
+
+				String reason = "";
+
+				try {
+					reason = e.getDetails().getErrors().get(0).getReason();
+				} catch (Exception ignore) {
+				}
+
+				System.out.println("❌ API ERROR FOR " + project + " : " + reason);
+
+				// Retry only for quota/API config problems
+				if (reason.equalsIgnoreCase("quotaExceeded") || reason.equalsIgnoreCase("dailyLimitExceeded")
+						|| reason.equalsIgnoreCase("accessNotConfigured") || reason.equalsIgnoreCase("forbidden")
+						|| reason.equalsIgnoreCase("rateLimitExceeded")) {
+
+					System.out.println("⚠ Switching to next project...");
+
+					continue;
+				}
+
+				e.printStackTrace();
+				break;
+
+			} catch (Exception e) {
+
+				e.printStackTrace();
+			}
+		}
+
+		if (!uploaded) {
+
+			System.out.println("❌ Upload failed. All projects exhausted.");
 		}
 	}
 
@@ -478,16 +537,21 @@ public class ytShorts {
 		// }
 	}
 
-	public static Credential authorize() throws Exception {
+	public static Credential authorize(String selectedProject) throws Exception {
+
+		System.out.println("USING PROJECT: " + selectedProject);
+
+		String credentialPath = "credentials/" + selectedProject + "/client_secret.json";
+
+		String tokenPath = "tokens/" + selectedProject;
 
 		GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JacksonFactory.getDefaultInstance(),
-				new InputStreamReader(new FileInputStream("YouTubeUploaderClient.json")));
+				new InputStreamReader(new FileInputStream(credentialPath)));
 
 		GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
 				GoogleNetHttpTransport.newTrustedTransport(), JacksonFactory.getDefaultInstance(), clientSecrets,
 				Collections.singletonList("https://www.googleapis.com/auth/youtube.upload")).setAccessType("offline")
-				.setDataStoreFactory(new FileDataStoreFactory(new File("tokens"))) // ✅ UPDATED
-				.build();
+				.setDataStoreFactory(new FileDataStoreFactory(new File(tokenPath))).build();
 
 		LocalServerReceiver receiver = new LocalServerReceiver.Builder().setPort(8888).build();
 

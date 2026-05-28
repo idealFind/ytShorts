@@ -1,5 +1,7 @@
 package yt;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
 import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
@@ -15,7 +17,10 @@ import com.google.api.services.youtube.model.VideoSnippet;
 import com.google.api.services.youtube.model.VideoStatus;
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.WaitUntilState;
-
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import java.time.LocalDate;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -24,16 +29,20 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class ytVideos {
+
+	private static final DateTimeFormatter REPORT_TIME = DateTimeFormatter.ofPattern("HH:mm | dd MMM yyyy");
+
+	private static final List<String> PROJECTS = Arrays.asList("project1", "project2", "project3", "project4",
+			"project5");
 
 	// ================= CONFIG =================
 	private static final String IMAGE_PREFIX = "img";
 
 	// private static final int MAX_CHARS_PER_LINE = 55;
 	private static final int FONT_SIZE = 32; // 30
-	private static final int LINE_HEIGHT = 40; // 56
+	private static final int LINE_HEIGHT = 40; // 40
 	public static String pageTitle;
 	public static Page page;
 	public static String safeTitle;
@@ -42,15 +51,65 @@ public class ytVideos {
 
 	private static final Random RANDOM = new Random();
 	private static final String APPLICATION_NAME = "YouTubeUploaderClient";
+	private static final Path REPORT_DIR = Paths.get("reports");
+
+	private static final Path REPORT_CSV = REPORT_DIR.resolve("upload_report.csv");
+
+	private static final Path REPORT_HTML = REPORT_DIR.resolve("dashboard.html");
+
+	private static final Path LOG_DIR = REPORT_DIR.resolve("logs");
+
+	private static final Path STATE_DIR = Paths.get("state");
+
+	private static final Path PROJECT_INDEX_FILE = STATE_DIR.resolve("project_index.txt");
+
+	private static final Path QUOTA_CACHE_FILE = STATE_DIR.resolve("quota_exceeded.txt");
 
 	// ==========================================
+
+	static class SceneData {
+
+		Path image;
+		Path audio;
+		Path segment;
+
+		double duration;
+
+		String transition;
+
+		String motionPreset;
+
+		public SceneData(Path image, Path audio, Path segment, double duration, String transition,
+				String motionPreset) {
+
+			this.image = image;
+			this.audio = audio;
+			this.segment = segment;
+			this.duration = duration;
+			this.transition = transition;
+			this.motionPreset = motionPreset;
+		}
+	}
 
 	public static void main(String[] args) throws Exception {
 
 		List<String> urls = Files.readAllLines(Paths.get("urls.txt"), StandardCharsets.UTF_8).stream().map(String::trim)
 				.filter(s -> !s.isBlank()).collect(Collectors.toList());
 
-		for (String url : urls) {
+		// for (String url : urls) {
+		for (String rawUrl : urls) {
+
+			String url = rawUrl.trim();
+
+			// SKIP INVALID URLS
+			if (!url.startsWith("http://") && !url.startsWith("https://")) {
+
+				System.out.println("\n⚠ INVALID URL SKIPPED: " + url);
+
+				appendReport("SKIPPED", "INVALID_URL", url, "", "", "Invalid URL in urls.txt");
+
+				continue;
+			}
 
 			System.out.println("=================================");
 			System.out.println(" PROCESSING URL ");
@@ -68,7 +127,20 @@ public class ytVideos {
 				BrowserContext context = browser.newContext();
 				page = context.newPage();
 
-				page.navigate(url, new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
+				// page.navigate(url, new
+				// Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
+				try {
+
+					page.navigate(url, new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
+
+				} catch (Exception ex) {
+
+					System.out.println("⚠ FAILED TO OPEN URL: " + url);
+
+					appendReport("FAILED", "NAVIGATION", url, "", "", ex.getMessage());
+
+					continue;
+				}
 				page.waitForTimeout(4000);
 
 				// pageTitle = page.locator("(//section//b)[1]").innerText();
@@ -143,6 +215,7 @@ public class ytVideos {
 						}
 
 						// ✅ NEW LINE (IMPORTANT)
+						caption = caption.replaceAll("\\s+", " ").trim();
 						caption = getFirstSentence(caption);
 
 						// ✅ REMOVE PHOTO CREDITS
@@ -214,7 +287,8 @@ public class ytVideos {
 
 				// ================= TEXT OVERLAY (NO RESIZE) =================
 
-				List<Path> downloadedImages = Files.list(downloadDir).sorted().collect(Collectors.toList());
+				List<Path> downloadedImages = Files.list(downloadDir).sorted(Comparator.comparing(Path::toString))
+						.collect(Collectors.toList());
 
 				// ================= CONVERT TO JPG =================
 
@@ -363,7 +437,7 @@ public class ytVideos {
 							"-stream_loop", "2", "-i", music.toAbsolutePath().toString(),
 
 							"-filter_complex",
-							"[0:a]volume=1.0[a0];" + "[1:a]volume=0.08[a1];"
+							"[0:a]volume=1.0[a0];" + "[1:a]volume=0.05[a1];"
 									+ "[a0][a1]amix=inputs=2:duration=first:dropout_transition=2[a]",
 
 							"-map", "0:v", "-map", "[a]",
@@ -407,15 +481,57 @@ public class ytVideos {
 				System.out.println("DESCRIPTION:\n" + description);
 
 				// 👉 CALL UPLOAD HERE
-				uploadToYouTube(baseDir.resolve(safeTitle + ".mp4").toFile(), viralTitle, description, tags);
+				// uploadToYouTube(baseDir.resolve(safeTitle + ".mp4").toFile(), viralTitle,
+				// description, tags);
+				uploadToYouTube(baseDir.resolve(safeTitle + ".mp4").toFile(), viralTitle, description, tags, url);
 			}
 		}
+	}
+
+	private static List<String> generateTags(String title) {
+
+		List<String> tags = new ArrayList<>();
+
+		if (title == null || title.isBlank()) {
+			return tags;
+		}
+
+		String[] words = title.split("\\s+");
+
+		Set<String> stopWords = Set.of("this", "that", "with", "from", "have", "were", "they", "about", "there",
+				"their", "what", "when", "your", "will", "into", "than");
+
+		for (String word : words) {
+
+			word = word.replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
+
+			if (word.length() < 4) {
+				continue;
+			}
+
+			if (!stopWords.contains(word)) {
+				tags.add(word);
+			}
+		}
+
+		// TRENDING BOOST TAGS
+		tags.addAll(List.of("viral", "trending", "youtube shorts", "breaking news", "entertainment", "celebrity news",
+				"india news", "cricket", "bollywood", "viral video", "shorts"));
+
+		return tags.stream().distinct().limit(50).collect(Collectors.toList());
 	}
 
 	private static void getPageTitle() {
 		if (page.locator("(//h1)[2]").count() > 0) {
 
 			pageTitle = page.locator("(//h1)[2]").innerText().trim();
+//			Locator h2 = page.locator("(//h1)[2]");
+//
+//			if (h2.count() > 0) {
+//				pageTitle = h2.first().innerText().trim();
+//			} else {
+//				pageTitle = page.locator("(//h1)[1]").first().innerText().trim();
+//			}
 
 		} else {
 
@@ -465,16 +581,19 @@ public class ytVideos {
 		return 4.0;
 	}
 
-	public static Credential authorize() throws Exception {
+	public static Credential authorize(String projectName) throws Exception {
+
+		Path credentialPath = Paths.get("credentials", projectName, "client_secret.json");
+
+		Path tokenPath = Paths.get("credentials", projectName, "tokens");
 
 		GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JacksonFactory.getDefaultInstance(),
-				new InputStreamReader(new FileInputStream("YouTubeUploaderClient.json")));
+				new InputStreamReader(new FileInputStream(credentialPath.toFile())));
 
 		GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
 				GoogleNetHttpTransport.newTrustedTransport(), JacksonFactory.getDefaultInstance(), clientSecrets,
 				Collections.singletonList("https://www.googleapis.com/auth/youtube.upload")).setAccessType("offline")
-				.setDataStoreFactory(new FileDataStoreFactory(new File("tokens"))) // ✅ UPDATED
-				.build();
+				.setDataStoreFactory(new FileDataStoreFactory(tokenPath.toFile())).build();
 
 		LocalServerReceiver receiver = new LocalServerReceiver.Builder().setPort(8888).build();
 
@@ -491,43 +610,472 @@ public class ytVideos {
 		return parts.length > 0 ? parts[0].trim() : text.trim();
 	}
 
-	private static void uploadToYouTube(File videoFile, String title, String description, List<String> tags) {
-
+	// private static void uploadToYouTube(File videoFile, String title, String
+	// description, List<String> tags) {
+	private static void uploadToYouTube(File videoFile, String title, String description, List<String> tags,
+			String sourceUrl) {
 		try {
-			Credential credential = authorize();
 
-			YouTube youtube = new YouTube.Builder(GoogleNetHttpTransport.newTrustedTransport(),
-					JacksonFactory.getDefaultInstance(), credential).setApplicationName(APPLICATION_NAME).build();
+			Files.createDirectories(REPORT_DIR);
+			Files.createDirectories(LOG_DIR);
+			Files.createDirectories(STATE_DIR);
 
-			Video video = new Video();
+			List<String> projects = getAvailableProjects();
 
-			VideoSnippet snippet = new VideoSnippet();
+			if (projects.isEmpty()) {
 
-			snippet.setTitle(title);
-			snippet.setDescription(description);
-			snippet.setTags(tags); // ✅ IMPORTANT: LIST, not string
+				throw new RuntimeException("No projects found");
+			}
 
-			video.setSnippet(snippet);
+			int startIndex = getNextProjectIndex(projects.size());
 
-			VideoStatus status = new VideoStatus();
-			status.setPrivacyStatus("private");
-			video.setStatus(status);
+			Collections.rotate(projects, -startIndex);
 
-			InputStreamContent mediaContent = new InputStreamContent("video/*", new FileInputStream(videoFile));
+			System.out.println("\nSTARTING PROJECT: " + projects.get(0));
 
-			YouTube.Videos.Insert request = youtube.videos().insert("snippet,status", video, mediaContent);
+			for (String project : projects) {
 
-			Video response = request.execute();
+				if (isProjectQuotaExceeded(project)) {
 
-			System.out.println("✅ Uploaded: https://youtube.com/watch?v=" + response.getId());
+					System.out.println("⚠ SKIPPING QUOTA EXHAUSTED: " + project);
+
+					continue;
+				}
+
+				try {
+
+					System.out.println("\n=================================");
+
+					System.out.println("TRYING PROJECT: " + project);
+
+					System.out.println("=================================");
+
+					Credential credential = authorize(project);
+
+					YouTube youtube = new YouTube.Builder(GoogleNetHttpTransport.newTrustedTransport(),
+							JacksonFactory.getDefaultInstance(), credential).setApplicationName(APPLICATION_NAME)
+							.build();
+
+					Video video = new Video();
+
+					VideoSnippet snippet = new VideoSnippet();
+
+					snippet.setTitle(title);
+
+					snippet.setDescription(description);
+
+					snippet.setTags(tags);
+
+					video.setSnippet(snippet);
+
+					VideoStatus status = new VideoStatus();
+
+					status.setPrivacyStatus("public");
+
+					video.setStatus(status);
+
+					InputStreamContent mediaContent = new InputStreamContent("video/*", new FileInputStream(videoFile));
+
+					YouTube.Videos.Insert request = youtube.videos().insert("snippet,status", video, mediaContent);
+
+					request.getMediaHttpUploader().setDirectUploadEnabled(false);
+
+					Video response = request.execute();
+
+					String videoUrl = "https://youtube.com/watch?v=" + response.getId();
+
+					System.out.println("✅ UPLOADED SUCCESSFULLY");
+
+					System.out.println(videoUrl);
+
+					appendReport("SUCCESS", project, sourceUrl, response.getId(), videoUrl, "");
+
+					generateHtmlDashboard();
+
+					return;
+
+				} catch (GoogleJsonResponseException e) {
+
+					String reason = "UNKNOWN";
+
+					try {
+
+						reason = e.getDetails().getErrors().get(0).getReason();
+
+					} catch (Exception ignore) {
+					}
+
+					System.out.println("❌ API ERROR: " + reason);
+
+					writeErrorLog(project, videoFile.getName(), e);
+
+					// logUpload(videoFile.getName(), project, "FAILED", "", reason);
+					appendReport("FAILED", project, sourceUrl, "", "", reason);
+
+					if (reason.equalsIgnoreCase("quotaExceeded") || reason.equalsIgnoreCase("dailyLimitExceeded")
+							|| reason.equalsIgnoreCase("rateLimitExceeded")) {
+
+						markProjectQuotaExceeded(project);
+
+						System.out.println("⚠ SWITCHING PROJECT...");
+
+						continue;
+					}
+
+					if (reason.equalsIgnoreCase("accessNotConfigured")) {
+
+						System.out.println("⚠ API NOT ENABLED");
+
+						continue;
+					}
+
+					e.printStackTrace();
+
+				} catch (Exception e) {
+
+					writeErrorLog(project, videoFile.getName(), e);
+
+					// logUpload(videoFile.getName(), project, "FAILED", "", e.getMessage());
+					appendReport("FAILED", project, sourceUrl, "", "", e.getMessage());
+
+					e.printStackTrace();
+				}
+			}
+
+			System.out.println("\n❌ ALL PROJECTS FAILED");
+
+			generateHtmlDashboard();
 
 		} catch (Exception e) {
+
+			e.printStackTrace();
+		}
+	}
+
+	private static List<String> getAvailableProjects() throws Exception {
+
+		return Files.list(Paths.get("credentials")).filter(Files::isDirectory).map(p -> p.getFileName().toString())
+				.sorted().collect(Collectors.toList());
+	}
+
+	private static int getNextProjectIndex(int totalProjects) throws Exception {
+
+		int index = 0;
+
+		if (Files.exists(PROJECT_INDEX_FILE)) {
+
+			String txt = Files.readString(PROJECT_INDEX_FILE).trim();
+
+			if (!txt.isBlank()) {
+
+				index = Integer.parseInt(txt);
+			}
+		}
+
+		int next = (index + 1) % totalProjects;
+
+		Files.writeString(PROJECT_INDEX_FILE, String.valueOf(next));
+
+		return index;
+	}
+
+	private static boolean isProjectQuotaExceeded(String project) {
+
+		try {
+
+			if (!Files.exists(QUOTA_CACHE_FILE)) {
+				return false;
+			}
+
+			List<String> lines = Files.readAllLines(QUOTA_CACHE_FILE);
+
+			LocalDate today = LocalDate.now();
+
+			for (String line : lines) {
+
+				String[] parts = line.split("=");
+
+				if (parts.length != 2) {
+					continue;
+				}
+
+				String p = parts[0];
+
+				LocalDate date = LocalDate.parse(parts[1]);
+
+				if (p.equals(project) && date.equals(today)) {
+
+					return true;
+				}
+			}
+
+		} catch (Exception e) {
+
+			e.printStackTrace();
+		}
+
+		return false;
+	}
+
+	private static void markProjectQuotaExceeded(String project) {
+
+		try {
+
+			String line = project + "=" + LocalDate.now();
+
+			Files.write(QUOTA_CACHE_FILE, Arrays.asList(line), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+
+		} catch (Exception e) {
+
+			e.printStackTrace();
+		}
+	}
+
+	private static void logUpload(String video, String project, String status, String videoId, String error) {
+
+		try {
+
+			boolean exists = Files.exists(REPORT_CSV);
+
+			try (BufferedWriter writer = Files.newBufferedWriter(REPORT_CSV, StandardOpenOption.CREATE,
+					StandardOpenOption.APPEND)) {
+
+				if (!exists) {
+
+					writer.write("time,video,project,status,videoId,error\n");
+				}
+
+				writer.write(LocalDateTime.now().format(REPORT_TIME) + "," + video + "," + project + "," + status + ","
+						+ videoId + "," + error + "\n");
+			}
+
+		} catch (Exception e) {
+
+			e.printStackTrace();
+		}
+	}
+
+	private static void writeErrorLog(String project, String video, Exception e) {
+
+		try {
+
+			String fileName = System.currentTimeMillis() + "_" + project + ".log";
+
+			Path logFile = LOG_DIR.resolve(fileName);
+
+			StringWriter sw = new StringWriter();
+
+			PrintWriter pw = new PrintWriter(sw);
+
+			e.printStackTrace(pw);
+
+			Files.writeString(logFile, sw.toString());
+
+		} catch (Exception ex) {
+
+			ex.printStackTrace();
+		}
+	}
+
+	// ======================================================
+	// REPORT APPEND METHOD
+	// ======================================================
+
+	private static void appendReport(String status, String project, String sourceUrl, String videoId, String videoUrl,
+			String error) {
+
+		try {
+
+			Files.createDirectories(REPORT_DIR);
+
+			boolean exists = Files.exists(REPORT_CSV);
+
+			try (BufferedWriter writer = Files.newBufferedWriter(REPORT_CSV, StandardOpenOption.CREATE,
+					StandardOpenOption.APPEND)) {
+
+				if (!exists) {
+
+					writer.write("time,status,project,sourceUrl,videoId,videoUrl,error\n");
+				}
+
+				String time = LocalDateTime.now().format(REPORT_TIME);
+
+				writer.write(csv(time) + "," + csv(status) + "," + csv(project) + "," + csv(sourceUrl) + ","
+						+ csv(videoId) + "," + csv(videoUrl) + "," + csv(error) + "\n");
+			}
+
+		} catch (Exception e) {
+
+			e.printStackTrace();
+		}
+	}
+
+	// ======================================================
+	// CSV SAFE VALUE
+	// ======================================================
+
+	private static String csv(String value) {
+
+		if (value == null) {
+			value = "";
+		}
+
+		value = value.replace("\"", "\"\"");
+
+		return "\"" + value + "\"";
+	}
+
+	private static void generateHtmlDashboard() {
+
+		try {
+
+			if (!Files.exists(REPORT_CSV)) {
+				return;
+			}
+
+			List<String> lines = Files.readAllLines(REPORT_CSV);
+
+			StringBuilder html = new StringBuilder();
+
+			html.append("""
+					<html>
+					<head>
+					<title>YouTube Upload Dashboard</title>
+
+					<style>
+
+					body{
+					    font-family:Arial;
+					    background:#111;
+					    color:white;
+					    padding:20px;
+					}
+
+					table{
+					    border-collapse:collapse;
+					    width:100%;
+					    background:#1a1a1a;
+					}
+
+					th,td{
+					    border:1px solid #333;
+					    padding:10px;
+					    text-align:left;
+					    font-size:14px;
+					}
+
+					th{
+					    background:#222;
+					    color:#00ff99;
+					}
+
+					tr:nth-child(even){
+					    background:#181818;
+					}
+
+					.success{
+					    color:#00ff99;
+					    font-weight:bold;
+					}
+
+					.failed{
+					    color:#ff5c5c;
+					    font-weight:bold;
+					}
+
+					.skipped{
+					    color:orange;
+					    font-weight:bold;
+					}
+
+					a{
+					    color:#4da6ff;
+					    text-decoration:none;
+					}
+
+					a:hover{
+					    text-decoration:underline;
+					}
+
+					</style>
+					</head>
+					<body>
+
+					<h2>YouTube Upload Dashboard</h2>
+
+					<table>
+					""");
+
+			boolean header = true;
+
+			for (String line : lines) {
+
+				List<String> cols = parseCsvLine(line);
+
+				html.append("<tr>");
+
+				for (int i = 0; i < cols.size(); i++) {
+
+					String col = cols.get(i);
+
+					if (header) {
+
+						html.append("<th>").append(col).append("</th>");
+
+					} else {
+
+						// STATUS COLUMN
+						if (i == 1) {
+
+							String css = col.toLowerCase();
+
+							html.append("<td class='").append(css).append("'>").append(col).append("</td>");
+						}
+
+						// VIDEO URL COLUMN
+						else if (i == 5 && !col.isBlank()) {
+
+							html.append("<td>").append("<a href='").append(col)
+									.append("' target='_blank'>OPEN VIDEO</a>").append("</td>");
+						}
+
+						else {
+
+							html.append("<td>").append(col).append("</td>");
+						}
+					}
+				}
+
+				html.append("</tr>");
+
+				header = false;
+			}
+
+			html.append("""
+					</table>
+					</body>
+					</html>
+					""");
+
+			Files.writeString(REPORT_HTML, html.toString());
+
+		} catch (Exception e) {
+
 			e.printStackTrace();
 		}
 	}
 
 	private static String generateViralTitle(String baseTitle) {
 
+		if (baseTitle == null)
+			baseTitle = "";
+
+		// REMOVE ALL PHOTO WORDS
+		baseTitle = baseTitle.replaceAll("(?i)\\bIN PHOTOS\\b", "").replaceAll("(?i)\\bPHOTOS\\b", "")
+				.replaceAll("(?i)\\bIN PICS\\b", "").replaceAll("(?i)\\bPICS\\b", "")
+				.replaceAll("(?i)\\bPHOTO GALLERY\\b", "").replaceAll("\\s+", " ").trim();
+
+		// CLEAN SYMBOLS
 		baseTitle = baseTitle.replaceAll("[^a-zA-Z0-9 ]", "").trim();
 
 		String[] hooks = { "You didnt notice this at first 👀", "This clip changed the internet 😱",
@@ -559,29 +1107,45 @@ public class ytVideos {
 
 		String finalTitle = hook + " | " + baseTitle;
 
-		// YouTube limit ~100 chars
+		// CLEAN AGAIN JUST IN CASE
+		finalTitle = finalTitle.replaceAll("(?i)\\bIN PHOTOS\\b", "").replaceAll("(?i)\\bPHOTOS\\b", "")
+				.replaceAll("(?i)\\bIN PICS\\b", "").replaceAll("(?i)\\bPICS\\b", "")
+				.replaceAll("(?i)\\bPHOTO GALLERY\\b", "").replaceAll("\\s+", " ").trim();
+
 		return finalTitle.length() > 100 ? finalTitle.substring(0, 100) : finalTitle;
 	}
 
-	private static List<String> generateTags(String title) {
+	private static List<String> parseCsvLine(String line) {
 
-		List<String> tags = new ArrayList<>();
+		List<String> result = new ArrayList<>();
 
-		String[] words = title.split("\\s+");
+		boolean inQuotes = false;
 
-		for (String word : words) {
-			word = word.replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
+		StringBuilder sb = new StringBuilder();
 
-			if (word.length() < 3)
-				continue;
+		for (char c : line.toCharArray()) {
 
-			tags.add(word);
+			if (c == '"') {
+
+				inQuotes = !inQuotes;
+			}
+
+			else if (c == ',' && !inQuotes) {
+
+				result.add(sb.toString());
+
+				sb.setLength(0);
+			}
+
+			else {
+
+				sb.append(c);
+			}
 		}
 
-		// Add trending boosters
-		tags.addAll(List.of("shorts", "viral", "trending", "india", "bollywood", "news", "shortvideo", "ytshorts"));
+		result.add(sb.toString());
 
-		return tags.stream().distinct().collect(Collectors.toList());
+		return result;
 	}
 
 	private static String generateHashtags(List<String> tags) {
@@ -612,12 +1176,10 @@ public class ytVideos {
 
 	private static boolean addTextJava2D(Path in, Path out, String text) throws IOException {
 
-		// ✅ DEBUG
 		System.out.println("Reading Image: " + in);
 
 		BufferedImage img = ImageIO.read(in.toFile());
 
-		// ✅ IMPORTANT FIX
 		if (img == null) {
 			System.out.println("❌ Unsupported/Invalid image: " + in);
 			return false;
@@ -626,21 +1188,19 @@ public class ytVideos {
 		Graphics2D g = img.createGraphics();
 
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
 		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-
 		g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-
-		// g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
-		// RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
 		g.setFont(new Font("DejaVu Sans", Font.BOLD, FONT_SIZE));
 
+		// NARROWER WIDTH = BETTER WRAPPING
 		List<String> lines = wrapText(g, text, img.getWidth() - 120);
 
 		FontMetrics fm = g.getFontMetrics();
 
-		// Dynamic bottom positioning
+		// int totalHeight = lines.size() * LINE_HEIGHT;
+
+		// MOVE CAPTIONS HIGHER
 		int y = img.getHeight() - 180;
 
 		for (String line : lines) {
@@ -649,9 +1209,9 @@ public class ytVideos {
 
 			int x = Math.max(40, (img.getWidth() - w) / 2);
 
+			// BIGGER BACKGROUND
 			g.setColor(new Color(0, 0, 0, 180));
 
-			// g.fillRoundRect(x - 20, y - fm.getAscent(), w + 40, fm.getHeight(), 20, 20);
 			g.fillRoundRect(x - 25, y - fm.getAscent() - 10, w + 50, fm.getHeight() + 20, 25, 25);
 
 			g.setColor(Color.WHITE);
@@ -659,11 +1219,15 @@ public class ytVideos {
 			g.drawString(line, x, y);
 
 			y += LINE_HEIGHT;
+			// EXTRA SPACING BETWEEN LINES
+			// y += LINE_HEIGHT + 10;
 		}
 
 		g.dispose();
 
 		ImageIO.write(img, "jpg", out.toFile());
+
+		img.flush();
 
 		return true;
 	}
@@ -807,13 +1371,18 @@ public class ytVideos {
 			}
 
 			String voice = "en-IN-NeerjaNeural";
+//			String voice;
+//
+//			if (text.length() > 120) {
+//				voice = "en-US-JennyNeural";
+//			} else {
+//				voice = "en-IN-NeerjaNeural";
+//			}
 
 			List<String> command = new ArrayList<>();
 
-			System.out.println("Running TTS: " + command);
-
 			// command.add("edge-tts");
-			command.add("python3");
+			command.add("python");
 			command.add("-m");
 			command.add("edge_tts");
 
@@ -825,6 +1394,7 @@ public class ytVideos {
 
 			command.add("--write-media");
 			command.add(outputPath.toAbsolutePath().toString());
+			System.out.println("Running TTS: " + command);
 
 			ProcessBuilder pb = new ProcessBuilder(command);
 
@@ -864,18 +1434,115 @@ public class ytVideos {
 				"libmp3lame", out.toString()), "Silent Audio");
 	}
 
+//	private static void renderCinematicTimeline(List<SceneData> scenes, Path output) throws Exception {
+//
+//		if (scenes.isEmpty()) {
+//			throw new RuntimeException("No scenes generated");
+//		}
+//
+//		if (scenes.size() == 1) {
+//
+//			Files.copy(scenes.get(0).segment, output, StandardCopyOption.REPLACE_EXISTING);
+//
+//			return;
+//		}
+//
+//		List<String> cmd = new ArrayList<>();
+//
+//		cmd.add("ffmpeg");
+//		cmd.add("-y");
+//
+//		// ================= INPUTS =================
+//
+//		for (SceneData s : scenes) {
+//
+//			cmd.add("-i");
+//			cmd.add(s.segment.toString());
+//		}
+//
+//		StringBuilder filter = new StringBuilder();
+//
+//		// ================= VIDEO CHAIN =================
+//
+//		double offset = scenes.get(0).duration - 1.0;
+//
+//		filter.append("[0:v][1:v]").append("xfade=transition=").append(scenes.get(1).transition).append(":duration=1")
+//				.append(":offset=").append(offset).append("[v1];");
+//
+//		for (int i = 2; i < scenes.size(); i++) {
+//
+//			offset += scenes.get(i - 1).duration - 1.0;
+//
+//			filter.append("[v").append(i - 1).append("][").append(i).append(":v]")
+//
+//					.append("xfade=transition=").append(scenes.get(i).transition)
+//
+//					.append(":duration=1").append(":offset=").append(offset)
+//
+//					.append("[v").append(i).append("];");
+//		}
+//
+//		// ================= AUDIO CHAIN =================
+//
+//		filter.append("[0:a][1:a]").append("acrossfade=d=1[a1];");
+//
+//		for (int i = 2; i < scenes.size(); i++) {
+//
+//			filter.append("[a").append(i - 1).append("][").append(i).append(":a]")
+//
+//					.append("acrossfade=d=1")
+//
+//					.append("[a").append(i).append("];");
+//		}
+//
+//		cmd.add("-filter_complex");
+//		cmd.add(filter.toString());
+//
+//		// ================= MAP FINAL =================
+//
+//		cmd.add("-map");
+//		cmd.add("[v" + (scenes.size() - 1) + "]");
+//
+//		cmd.add("-map");
+//		cmd.add("[a" + (scenes.size() - 1) + "]");
+//
+//		cmd.add("-c:v");
+//		cmd.add("libx264");
+//
+//		cmd.add("-preset");
+//		cmd.add("medium");
+//
+//		cmd.add("-crf");
+//		cmd.add("20");
+//
+//		cmd.add("-pix_fmt");
+//		cmd.add("yuv420p");
+//
+//		cmd.add("-c:a");
+//		cmd.add("aac");
+//
+//		cmd.add(output.toString());
+//
+//		runFFmpeg(cmd, "Cinematic Timeline");
+//	}
+
 	private static String sanitizeForFolderName(String s) {
 
 		if (s == null || s.isBlank()) {
 			return "output_" + System.currentTimeMillis();
 		}
 
-		String cleaned = s.replaceAll("[\\\\/:*?\"<>|!]", "") // illegal chars
-				.replaceAll("[']", "") // remove apostrophe
-				.replaceAll("[^a-zA-Z0-9 ]", "") // safe chars only
-				.replaceAll("\\s+", " ") // normalize spaces
-				.replaceAll("Ent Top Stories", "").replaceAll("(?i)in photos", "").replaceAll("Ent Top Stories", "")
-				.replaceAll("(?i)photos", "").replaceAll("(?i)pics/", "").replaceAll("(?i)in pics", "").trim();
+//		String cleaned = s.replaceAll("[\\\\/:*?\"<>|!]", "") // illegal chars
+//				.replaceAll("[']", "") // remove apostrophe
+//				.replaceAll("[^a-zA-Z0-9 ]", "") // safe chars only
+//				.replaceAll("\\s+", " ") // normalize spaces
+//				.replaceAll("Ent Top Stories", "").replaceAll("(?i)in photos", "").replaceAll("Ent Top Stories", "")
+//				.replaceAll("(?i)photos", "").replaceAll("(?i)pics/", "").replaceAll("(?i)in pics", "").trim();
+
+		String cleaned = s.replaceAll("[\\\\/:*?\"<>|!]", "").replaceAll("[']", "").replaceAll("\\s+", " ")
+				.replaceAll("(?i)ent top stories", "").replaceAll("(?i)in photos", "").replaceAll("(?i)photos", "")
+				.replaceAll("(?i)pics", "").replaceAll("(?i)photo gallery", "").replaceAll("(?i)viral pics", "")
+				.replaceAll("(?i)exclusive photos", "").replaceAll("(?i)see pics", "").trim();
 
 		// ✅ limit length safely
 		if (cleaned.length() > 100) {
