@@ -126,6 +126,8 @@ public class ytVideos {
 
 				BrowserContext context = browser.newContext();
 				page = context.newPage();
+				page.setDefaultTimeout(60000);
+				page.setDefaultNavigationTimeout(60000);
 
 				// page.navigate(url, new
 				// Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
