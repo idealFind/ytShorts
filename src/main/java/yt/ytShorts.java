@@ -1,8 +1,11 @@
 package yt;
 
 import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
 import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
@@ -50,6 +53,21 @@ public class ytShorts {
 	private static final int FPS = 30;
 
 	private static final String APPLICATION_NAME = "YouTubeUploaderClient";
+	private static final DateTimeFormatter REPORT_TIME = DateTimeFormatter.ofPattern("HH:mm | dd MMM yyyy");
+
+	private static final Path REPORT_DIR = Paths.get("reports");
+
+	private static final Path REPORT_CSV = REPORT_DIR.resolve("upload_report.csv");
+
+	private static final Path REPORT_HTML = REPORT_DIR.resolve("dashboard.html");
+
+	private static final Path LOG_DIR = REPORT_DIR.resolve("logs");
+
+	private static final Path STATE_DIR = Paths.get("state");
+
+	private static final Path PROJECT_INDEX_FILE = STATE_DIR.resolve("project_index.txt");
+
+	private static final Path QUOTA_CACHE_FILE = STATE_DIR.resolve("quota_exceeded.txt");
 
 	private static final Path MUSIC_DIR = Paths.get("music");
 	private static final Random RANDOM = new Random();
@@ -409,101 +427,461 @@ public class ytShorts {
 
 	private static void Upload(File videoFile) {
 
-		List<String> projects = Arrays.asList("project1", "project2", "project3", "project4", "project5");
+		try {
 
-		boolean uploaded = false;
+			Files.createDirectories(REPORT_DIR);
+			Files.createDirectories(LOG_DIR);
+			Files.createDirectories(STATE_DIR);
 
-		for (String project : projects) {
+			List<String> projects = getAvailableProjects();
 
-			try {
+			if (projects.isEmpty()) {
 
-				System.out.println("\n=================================");
-				System.out.println("TRYING PROJECT: " + project);
-				System.out.println("=================================");
+				throw new RuntimeException("No projects found");
+			}
 
-				Credential credential = authorize(project);
+			int startIndex = getNextProjectIndex(projects.size());
 
-				YouTube youtube = new YouTube.Builder(GoogleNetHttpTransport.newTrustedTransport(),
-						JacksonFactory.getDefaultInstance(), credential).setApplicationName(APPLICATION_NAME).build();
+			Collections.rotate(projects, -startIndex);
 
-				Video videoObject = new Video();
+			System.out.println("\nSTARTING PROJECT: " + projects.get(0));
 
-				VideoSnippet snippet = new VideoSnippet();
+			for (String project : projects) {
 
-				String fullTitle = cleanText(safeTitle) + " #shorts #shortvideo";
+				if (isProjectQuotaExceeded(project)) {
 
-				String finalTitle = fullTitle.length() > 100 ? fullTitle.substring(0, 100) : fullTitle;
-
-				snippet.setTitle(finalTitle);
-
-				String finalDesc = cleanText(safeTitle) + "\n\n" + cleanText(allCaptions) + "\n";
-
-				finalDesc = finalDesc.length() > 5000 ? finalDesc.substring(0, 5000) : finalDesc;
-
-				snippet.setDescription(finalDesc);
-
-				split_word_add_Hashtag();
-
-				snippet.setTags(Collections.singletonList(finalOutput + "#Shorts,#YouTubeShorts,"
-						+ "#ViralMoments,#TrendingShorts," + "#CelebrityFashion,#RedCarpetStyle,"
-						+ "#CelebrityLook,#FashionMoment," + "#PopCulture,#EntertainmentNews,"
-						+ "#ModelStyle,#CelebrityStyle," + "#ViralVideo,#HollywoodBuzz," + "#StyleInspo,#bollywood,"
-						+ "#bollywoodfashion,#dress," + "#celebsdress,#celebslook," + "#shortvideo,#cricket,"
-						+ "#ipl2026,#news,#politics"));
-
-				videoObject.setSnippet(snippet);
-
-				VideoStatus status = new VideoStatus();
-				status.setPrivacyStatus("public");
-
-				videoObject.setStatus(status);
-
-				InputStreamContent mediaContent = new InputStreamContent("video/*", new FileInputStream(videoFile));
-
-				YouTube.Videos.Insert videoInsert = youtube.videos().insert("snippet,status", videoObject,
-						mediaContent);
-
-				Video returnedVideo = videoInsert.execute();
-
-				System.out.println(
-						"✅ Uploaded using " + project + ": https://youtube.com/watch?v=" + returnedVideo.getId());
-
-				uploaded = true;
-				break;
-
-			} catch (GoogleJsonResponseException e) {
-
-				String reason = "";
-
-				try {
-					reason = e.getDetails().getErrors().get(0).getReason();
-				} catch (Exception ignore) {
-				}
-
-				System.out.println("❌ API ERROR FOR " + project + " : " + reason);
-
-				// Retry only for quota/API config problems
-				if (reason.equalsIgnoreCase("quotaExceeded") || reason.equalsIgnoreCase("dailyLimitExceeded")
-						|| reason.equalsIgnoreCase("accessNotConfigured") || reason.equalsIgnoreCase("forbidden")
-						|| reason.equalsIgnoreCase("rateLimitExceeded")) {
-
-					System.out.println("⚠ Switching to next project...");
+					System.out.println("⚠ SKIPPING QUOTA EXHAUSTED: " + project);
 
 					continue;
 				}
 
-				e.printStackTrace();
-				break;
+				try {
 
-			} catch (Exception e) {
+					System.out.println("\n=================================");
+					System.out.println("TRYING PROJECT: " + project);
+					System.out.println("=================================");
 
-				e.printStackTrace();
+					Credential credential = authorize(project);
+
+					YouTube youtube = new YouTube.Builder(GoogleNetHttpTransport.newTrustedTransport(),
+							JacksonFactory.getDefaultInstance(), credential).setApplicationName(APPLICATION_NAME)
+							.build();
+
+					Video videoObject = new Video();
+
+					VideoSnippet snippet = new VideoSnippet();
+
+					String fullTitle = cleanText(safeTitle) + " #shorts #shortvideo";
+
+					String finalTitle = fullTitle.length() > 100 ? fullTitle.substring(0, 100) : fullTitle;
+
+					snippet.setTitle(finalTitle);
+
+					String finalDesc = cleanText(safeTitle) + "\n\n" + cleanText(allCaptions) + "\n";
+
+					finalDesc = finalDesc.length() > 5000 ? finalDesc.substring(0, 5000) : finalDesc;
+
+					snippet.setDescription(finalDesc);
+
+					split_word_add_Hashtag();
+
+					snippet.setTags(Collections.singletonList(finalOutput + "#Shorts,#YouTubeShorts,"
+							+ "#ViralMoments,#TrendingShorts," + "#CelebrityFashion,#RedCarpetStyle,"
+							+ "#CelebrityLook,#FashionMoment," + "#PopCulture,#EntertainmentNews,"
+							+ "#ModelStyle,#CelebrityStyle," + "#ViralVideo,#HollywoodBuzz," + "#StyleInspo,#bollywood,"
+							+ "#bollywoodfashion,#dress," + "#celebsdress,#celebslook," + "#shortvideo,#cricket,"
+							+ "#ipl2026,#news,#politics"));
+
+					videoObject.setSnippet(snippet);
+
+					VideoStatus status = new VideoStatus();
+
+					status.setPrivacyStatus("public");
+
+					videoObject.setStatus(status);
+
+					InputStreamContent mediaContent = new InputStreamContent("video/*", new FileInputStream(videoFile));
+
+					YouTube.Videos.Insert videoInsert = youtube.videos().insert("snippet,status", videoObject,
+							mediaContent);
+
+					Video returnedVideo = videoInsert.execute();
+
+					String videoUrl = "https://youtube.com/watch?v=" + returnedVideo.getId();
+
+					System.out.println("✅ UPLOADED SUCCESSFULLY");
+
+					System.out.println(videoUrl);
+
+					appendReport("SUCCESS", project, "", returnedVideo.getId(), videoUrl, "");
+
+					generateHtmlDashboard();
+
+					return;
+
+				} catch (GoogleJsonResponseException e) {
+
+					String reason = "UNKNOWN";
+
+					try {
+
+						reason = e.getDetails().getErrors().get(0).getReason();
+
+					} catch (Exception ignore) {
+					}
+
+					System.out.println("❌ API ERROR: " + reason);
+
+					writeErrorLog(project, videoFile.getName(), e);
+
+					appendReport("FAILED", project, "", "", "", reason);
+
+					if (reason.equalsIgnoreCase("quotaExceeded") || reason.equalsIgnoreCase("dailyLimitExceeded")
+							|| reason.equalsIgnoreCase("rateLimitExceeded")) {
+
+						markProjectQuotaExceeded(project);
+
+						System.out.println("⚠ SWITCHING PROJECT...");
+
+						continue;
+					}
+
+					if (reason.equalsIgnoreCase("accessNotConfigured")) {
+
+						System.out.println("⚠ API NOT ENABLED");
+
+						continue;
+					}
+
+					e.printStackTrace();
+
+				} catch (Exception e) {
+
+					writeErrorLog(project, videoFile.getName(), e);
+
+					appendReport("FAILED", project, "", "", "", e.getMessage());
+
+					e.printStackTrace();
+				}
+			}
+
+			System.out.println("\n❌ ALL PROJECTS FAILED");
+
+			generateHtmlDashboard();
+
+		} catch (Exception e) {
+
+			e.printStackTrace();
+		}
+	}
+
+	private static List<String> getAvailableProjects() throws Exception {
+
+		return Files.list(Paths.get("credentials")).filter(Files::isDirectory).map(p -> p.getFileName().toString())
+				.sorted().collect(Collectors.toList());
+	}
+
+	private static int getNextProjectIndex(int totalProjects) throws Exception {
+
+		int index = 0;
+
+		if (Files.exists(PROJECT_INDEX_FILE)) {
+
+			String txt = Files.readString(PROJECT_INDEX_FILE).trim();
+
+			if (!txt.isBlank()) {
+
+				index = Integer.parseInt(txt);
 			}
 		}
 
-		if (!uploaded) {
+		int next = (index + 1) % totalProjects;
 
-			System.out.println("❌ Upload failed. All projects exhausted.");
+		Files.writeString(PROJECT_INDEX_FILE, String.valueOf(next));
+
+		return index;
+	}
+
+	private static boolean isProjectQuotaExceeded(String project) {
+
+		try {
+
+			if (!Files.exists(QUOTA_CACHE_FILE)) {
+				return false;
+			}
+
+			List<String> lines = Files.readAllLines(QUOTA_CACHE_FILE);
+
+			LocalDate today = LocalDate.now();
+
+			for (String line : lines) {
+
+				String[] parts = line.split("=");
+
+				if (parts.length != 2) {
+					continue;
+				}
+
+				String p = parts[0];
+
+				LocalDate date = LocalDate.parse(parts[1]);
+
+				if (p.equals(project) && date.equals(today)) {
+
+					return true;
+				}
+			}
+
+		} catch (Exception e) {
+
+			e.printStackTrace();
+		}
+
+		return false;
+	}
+
+	private static void markProjectQuotaExceeded(String project) {
+
+		try {
+
+			String line = project + "=" + LocalDate.now();
+
+			Files.write(QUOTA_CACHE_FILE, Arrays.asList(line), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+
+		} catch (Exception e) {
+
+			e.printStackTrace();
+		}
+	}
+
+	private static void writeErrorLog(String project, String video, Exception e) {
+
+		try {
+
+			String fileName = System.currentTimeMillis() + "_" + project + ".log";
+
+			Path logFile = LOG_DIR.resolve(fileName);
+
+			StringWriter sw = new StringWriter();
+
+			PrintWriter pw = new PrintWriter(sw);
+
+			e.printStackTrace(pw);
+
+			Files.writeString(logFile, sw.toString());
+
+		} catch (Exception ex) {
+
+			ex.printStackTrace();
+		}
+	}
+
+	private static void appendReport(String status, String project, String sourceUrl, String videoId, String videoUrl,
+			String error) {
+
+		try {
+
+			Files.createDirectories(REPORT_DIR);
+
+			boolean exists = Files.exists(REPORT_CSV);
+
+			try (BufferedWriter writer = Files.newBufferedWriter(REPORT_CSV, StandardOpenOption.CREATE,
+					StandardOpenOption.APPEND)) {
+
+				if (!exists) {
+
+					writer.write("TIME,STATUS,project,sourceUrl,videoId,videoUrl,error\n");
+				}
+
+				String time = LocalDateTime.now().format(REPORT_TIME);
+
+				writer.write(csv(time) + "," + csv(status) + "," + csv(project) + "," + csv(sourceUrl) + ","
+						+ csv(videoId) + "," + csv(videoUrl) + "," + csv(error) + "\n");
+			}
+
+		} catch (Exception e) {
+
+			e.printStackTrace();
+		}
+	}
+
+	private static String csv(String value) {
+
+		if (value == null) {
+			value = "";
+		}
+
+		value = value.replace("\"", "\"\"");
+
+		return "\"" + value + "\"";
+	}
+
+	private static List<String> parseCsvLine(String line) {
+
+		List<String> result = new ArrayList<>();
+
+		boolean inQuotes = false;
+
+		StringBuilder sb = new StringBuilder();
+
+		for (char c : line.toCharArray()) {
+
+			if (c == '"') {
+
+				inQuotes = !inQuotes;
+
+			} else if (c == ',' && !inQuotes) {
+
+				result.add(sb.toString());
+
+				sb.setLength(0);
+
+			} else {
+
+				sb.append(c);
+			}
+		}
+
+		result.add(sb.toString());
+
+		return result;
+	}
+
+	private static void generateHtmlDashboard() {
+
+		try {
+
+			if (!Files.exists(REPORT_CSV)) {
+				return;
+			}
+
+			List<String> lines = Files.readAllLines(REPORT_CSV);
+
+			StringBuilder html = new StringBuilder();
+
+			html.append("""
+					<html>
+					<head>
+					<title>YouTube Shorts Upload Dashboard</title>
+
+					<style>
+
+					body{
+					    font-family:Arial;
+					    background:#111;
+					    color:white;
+					    padding:20px;
+					}
+
+					table{
+					    border-collapse:collapse;
+					    width:100%;
+					    background:#1a1a1a;
+					}
+
+					th,td{
+					    border:1px solid #333;
+					    padding:10px;
+					    text-align:left;
+					    font-size:14px;
+					}
+
+					th{
+					    background:#222;
+					    color:#00ff99;
+					}
+
+					tr:nth-child(even){
+					    background:#181818;
+					}
+
+					.success{
+					    color:#00ff99;
+					    font-weight:bold;
+					}
+
+					.failed{
+					    color:#ff5c5c;
+					    font-weight:bold;
+					}
+
+					.skipped{
+					    color:orange;
+					    font-weight:bold;
+					}
+
+					a{
+					    color:#4da6ff;
+					    text-decoration:none;
+					}
+
+					a:hover{
+					    text-decoration:underline;
+					}
+
+					</style>
+					</head>
+					<body>
+
+					<h2>YouTube Shorts Upload Dashboard</h2>
+
+					<table>
+					""");
+
+			boolean header = true;
+
+			for (String line : lines) {
+
+				List<String> cols = parseCsvLine(line);
+
+				html.append("<tr>");
+
+				for (int i = 0; i < cols.size(); i++) {
+
+					String col = cols.get(i);
+
+					if (header) {
+
+						html.append("<th>").append(col).append("</th>");
+
+					} else {
+
+						if (i == 1) {
+
+							String css = col.toLowerCase();
+
+							html.append("<td class='").append(css).append("'>").append(col).append("</td>");
+						}
+
+						else if (i == 5 && !col.isBlank()) {
+
+							html.append("<td>").append("<a href='").append(col)
+									.append("' target='_blank'>OPEN VIDEO</a>").append("</td>");
+						}
+
+						else {
+
+							html.append("<td>").append(col).append("</td>");
+						}
+					}
+				}
+
+				html.append("</tr>");
+
+				header = false;
+			}
+
+			html.append("""
+					</table>
+					</body>
+					</html>
+					""");
+
+			Files.writeString(REPORT_HTML, html.toString());
+
+		} catch (Exception e) {
+
+			e.printStackTrace();
 		}
 	}
 

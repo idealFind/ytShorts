@@ -3,14 +3,13 @@ name: URL_Shorts
 on:
   workflow_dispatch:
 
-  #schedule:
-   # - cron: '30 11 * * *'
+  schedule:
+    - cron: '0 9 * * *'
 
 permissions:
   contents: write
 
 jobs:
-
   update-urls:
 
     runs-on: ubuntu-latest
