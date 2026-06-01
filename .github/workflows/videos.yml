@@ -69,7 +69,10 @@ jobs:
           mvn exec:java \
           -Dexec.mainClass=com.microsoft.playwright.CLI \
           -Dexec.args="install"
-          
+      - name: Install Playwright Dependencies
+        run: |
+          sudo apt-get update
+          npx playwright install --with-deps chromium    
       # =========================
       # MAVEN CACHE
       # =========================
