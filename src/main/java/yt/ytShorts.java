@@ -676,8 +676,9 @@ public class ytShorts {
 		}
 	}
 
-	private static void appendReport(String status, String project, String sourceUrl, String videoId, String videoUrl,
+	private static void appendReport(String status, String project, String sourceUrl, String videoType, String videoUrl,
 			String error) {
+		videoType = "Shorts";
 
 		try {
 
@@ -690,13 +691,13 @@ public class ytShorts {
 
 				if (!exists) {
 
-					writer.write("TIME,STATUS,project,sourceUrl,videoId,videoUrl,error\n");
+					writer.write("TIME,STATUS,project,sourceUrl,videoType,videoUrl,error\n");
 				}
 
 				String time = LocalDateTime.now().format(REPORT_TIME);
 
 				writer.write(csv(time) + "," + csv(status) + "," + csv(project) + "," + csv(sourceUrl) + ","
-						+ csv(videoId) + "," + csv(videoUrl) + "," + csv(error) + "\n");
+						+ csv(videoType) + "," + csv(videoUrl) + "," + csv(error) + "\n");
 			}
 
 		} catch (Exception e) {

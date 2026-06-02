@@ -342,7 +342,7 @@ public class ytVideos {
 						Path ttsAudio = segmentsDir.resolve(String.format("audio_%03d.mp3", i));
 						Path videoSegment = segmentsDir.resolve(String.format("seg_%03d.mp4", i));
 
-						System.out.println("\nSEGMENT " + i);
+						System.out.println("\nSEGMENT " + i + " of " + segmentSafeSize);
 						System.out.println("TEXT: " + text);
 
 						boolean ttsSuccess = generateTTS(text, ttsAudio);
@@ -524,20 +524,36 @@ public class ytVideos {
 	}
 
 	private static void getPageTitle() {
-		if (page.locator("(//h1)[2]").count() > 0) {
+		try {
 
-			pageTitle = page.locator("(//h1)[2]").innerText().trim();
-//			Locator h2 = page.locator("(//h1)[2]");
-//
-//			if (h2.count() > 0) {
-//				pageTitle = h2.first().innerText().trim();
-//			} else {
-//				pageTitle = page.locator("(//h1)[1]").first().innerText().trim();
-//			}
+			Locator h1Second = page.locator("(//h1)[2]");
 
-		} else {
+			if (h1Second.count() > 0) {
 
-			pageTitle = page.locator("(//h1)[1]").innerText().trim();
+				pageTitle = h1Second.first().innerText().trim();
+
+			} else {
+
+				pageTitle = page.locator("(//h1)[1]").first().innerText().trim();
+			}
+
+			// BAD TITLES FILTER
+			if (pageTitle == null || pageTitle.isBlank() || pageTitle.toLowerCase().contains("opt out")
+					|| pageTitle.toLowerCase().contains("privacy") || pageTitle.toLowerCase().contains("cookie")) {
+
+				pageTitle = "shorts_" + System.currentTimeMillis();
+			}
+
+			safeTitle = sanitizeForFolderName(pageTitle);
+
+			System.out.println("PAGE TITLE: " + pageTitle);
+			System.out.println("SAFE TITLE: " + safeTitle);
+
+		} catch (Exception e) {
+
+			pageTitle = "shorts_" + System.currentTimeMillis();
+
+			safeTitle = sanitizeForFolderName(pageTitle);
 		}
 	}
 
@@ -883,8 +899,9 @@ public class ytVideos {
 	// REPORT APPEND METHOD
 	// ======================================================
 
-	private static void appendReport(String status, String project, String sourceUrl, String videoId, String videoUrl,
+	private static void appendReport(String status, String project, String sourceUrl, String videoType, String videoUrl,
 			String error) {
+		videoType = "Video";
 
 		try {
 
@@ -897,13 +914,13 @@ public class ytVideos {
 
 				if (!exists) {
 
-					writer.write("time,status,project,sourceUrl,videoId,videoUrl,error\n");
+					writer.write("time,status,project,sourceUrl,videoType,videoUrl,error\n");
 				}
 
 				String time = LocalDateTime.now().format(REPORT_TIME);
 
 				writer.write(csv(time) + "," + csv(status) + "," + csv(project) + "," + csv(sourceUrl) + ","
-						+ csv(videoId) + "," + csv(videoUrl) + "," + csv(error) + "\n");
+						+ csv(videoType) + "," + csv(videoUrl) + "," + csv(error) + "\n");
 			}
 
 		} catch (Exception e) {
