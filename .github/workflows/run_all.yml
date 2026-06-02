@@ -20,7 +20,7 @@ jobs:
           java-version: 17
 
       - name: Run URL Shorts
-        run: mvn exec:java -Dexec.mainClass="yt.UrlShorts"
+        run: mvn exec:java -Dexec.mainClass="yt.MidDayTest"
 
       - name: Run Shorts
         run: mvn exec:java -Dexec.mainClass="yt.ytShorts"
