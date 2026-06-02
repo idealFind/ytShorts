@@ -4,7 +4,11 @@ permissions:
   contents: write
 
 on:
-  workflow_dispatch:
+  #workflow_dispatch:
+  workflow_run:
+    workflows: ["URL Shorts"]
+    types:
+      - completed
 
   #schedule:
    # - cron: '15 9 * * *'
