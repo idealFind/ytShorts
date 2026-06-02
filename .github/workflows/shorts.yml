@@ -1,4 +1,4 @@
-name: Shorts Automation
+name: Shorts
 
 permissions:
   contents: write
@@ -6,7 +6,7 @@ permissions:
 on:
   #workflow_dispatch:
   workflow_run:
-    workflows: ["URL Shorts"]
+    workflows: ["URL_Shorts"]
     types:
       - completed
 
