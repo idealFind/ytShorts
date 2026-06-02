@@ -1,0 +1,39 @@
+name: run_all - Sequential Workflows
+
+on:
+  schedule:
+    - cron: '37 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger URL_Shorts workflow
+        run: |
+          gh workflow run url_shorts.yml --ref main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for URL_Shorts to complete
+        run: |
+          sleep 120  # Wait 2 minutes for URL_Shorts to finish
+          
+      - name: Trigger Shorts Automation workflow
+        run: |
+          gh workflow run shorts.yml --ref main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for Shorts Automation to complete
+        run: |
+          sleep 180  # Wait 3 minutes for Shorts Automation to finish
+          
+      - name: Trigger Videos Automation workflow
+        run: |
+          gh workflow run videos.yml --ref main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
