@@ -2,7 +2,7 @@ name: URL_Shorts
 
 on:    
   schedule:
-    - cron: '37 9 * * *'
+    - cron: '37 7 * * *'
   workflow_dispatch:
 
 permissions:
