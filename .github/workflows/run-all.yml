@@ -1,0 +1,17 @@
+name: Run All
+
+on:
+  workflow_dispatch:
+
+jobs:
+
+  workflow1:
+    uses: ./.github/workflows/url_Shorts.yml
+
+  workflow2:
+    needs: workflow1
+    uses: ./.github/workflows/shorts.yml
+
+  workflow3:
+    needs: workflow2
+    uses: ./.github/workflows/videos.yml
