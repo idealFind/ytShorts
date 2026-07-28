@@ -1,13 +1,13 @@
-name: Videos Automation
+name: videos
 
 permissions:
   contents: write
   
 on:
-  workflow_dispatch:
-
-  schedule:
-    - cron: '30 9 * * *'
+  workflow_call:
+ 
+  #schedule:
+   # - cron: '30 9 * * *'
 
 jobs:
   build:
