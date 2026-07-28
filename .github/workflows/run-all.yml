@@ -1,6 +1,8 @@
 name: Run All
 
 on:
+  schedule:
+    - cron: '37 9 * * *'
   workflow_dispatch:
 
 jobs:
