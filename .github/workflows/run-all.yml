@@ -1,4 +1,4 @@
-name: Run All
+name: run-all
 
 on:
   schedule:
@@ -7,11 +7,11 @@ on:
 
 jobs:
 
-  url_shorts:
-    uses: ./.github/workflows/url_shorts.yml
+  URL:
+    uses: ./.github/workflows/URL.yml
 
   shorts:
-    needs: url_shorts
+    needs: URL
     uses: ./.github/workflows/shorts.yml
 
   videos:
