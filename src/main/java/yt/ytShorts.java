@@ -19,6 +19,7 @@ import com.google.api.services.youtube.model.Video;
 import com.google.api.services.youtube.model.VideoSnippet;
 import com.google.api.services.youtube.model.VideoStatus;
 import com.microsoft.playwright.*;
+import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.WaitUntilState;
 
 import javax.imageio.ImageIO;
@@ -105,12 +106,35 @@ public class ytShorts {
 			try (Playwright pw = Playwright.create()) {
 
 				Browser browser = pw.chromium().launch(new BrowserType.LaunchOptions().setHeadless(true));
+				System.out.println("Browser Launched ... " + browser);
 
 				BrowserContext context = browser.newContext();
 				page = context.newPage();
 
-				page.navigate(url, new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
-				page.waitForTimeout(5000);
+				// page.navigate(url, new
+				// Page.NavigateOptions().setWaitUntil(WaitUntilState.NETWORKIDLE));
+
+				page.navigate(url,
+						new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED).setTimeout(60000));
+
+				System.out.println("TITLE: " + page.title());
+				System.out.println("PAGE URL: " + page.url());
+
+				System.out.println("h1 count: " + page.locator("h1").count());
+
+				System.out.println("img count: " + page.locator("img").count());
+
+				System.out.println("photos count: " + page.locator("div[class*='photos']").count());
+
+				page.waitForLoadState();
+				page.waitForTimeout(3000);
+
+				// Scroll once to trigger lazy rendering
+				page.evaluate("window.scrollTo(0, document.body.scrollHeight/2)");
+				page.waitForTimeout(1500);
+
+				page.evaluate("window.scrollTo(0,0)");
+				page.waitForTimeout(1500);
 
 				// String pageTitle = page.locator("h1 span").last().textContent().trim();
 //				String pageTitle = page.locator("(//h1)[1]").innerText().trim();
@@ -135,21 +159,64 @@ public class ytShorts {
 //						+ "contains(@class,'mumbai-background') or " + "contains(@class,'mumbai-guide-background')"
 //						+ "]//img[@alt]").all();
 
-				List<Locator> cards = page.locator("div.photos_cardposition__71WWM").all();
-				System.out.println("TOTAL CARDS: " + cards.size());
+				// Locator cards = page.locator("div[class*='photos_cardposition']");
+				Locator cards = page.locator(
+						"div[class*='photos_cardposition'], " + "div[class*='photoTimelineItem'], " + "article");
+
+				System.out.println("Cards Found : " + cards.count());
+				System.out.println("TOTAL CARDS : " + cards.count());
+
+				if (cards.count() == 0) {
+
+					Files.writeString(Paths.get("debug.html"), page.content());
+
+					System.out.println("Saved debug.html");
+
+					return;
+				}
 
 				int downloadIndex = 1;
 
-				for (Locator card : cards) {
+				for (int i = 0; i < cards.count(); i++) {
+
+					Locator card = cards.nth(i);
+
+					// Locator card = cards.nth(i);
+
+					// int downloadIndex = 1;
+
+//				for (Locator card : cards) {
 
 					try {
 
-						Locator img = card.locator("div.main-img img");
+						// Locator img = card.locator("div.main-img img");
+						// Locator img = card.locator("img[src], img[data-src]").first();
 
-						String src = img.getAttribute("src");
+						Locator img = card.locator("div[class*='photos_photoTimelineItem']");
+
+						String src = card.locator(".main-img").getAttribute("data-image");
+						System.out.println("IMAGE URL : " + src);
+
+//						String src = img.evaluate("(img)=>img.currentSrc || img.src").toString();
+//
+//						if (src == null || src.isBlank())
+//							src = img.getAttribute("data-src");
+//
+//						if (src == null || src.isBlank())
+//							src = card.locator(".main-img").getAttribute("data-image");
+//
+//						if (src == null || src.isBlank()) {
+//
+//							String srcset = img.getAttribute("srcset");
+//
+//							if (srcset != null)
+//								src = srcset.split(",")[0].trim().split(" ")[0];
+//						}
 
 						// Skip ads
-						if (card.innerText().contains("ADVERTISEMENT"))
+						String cardText = card.innerText();
+
+						if (cardText.toUpperCase().contains("ADVERTISEMENT"))
 							continue;
 
 						// Lazy load fallback
@@ -172,18 +239,31 @@ public class ytShorts {
 						String caption;
 
 						// FIRST IMAGE = FULL TITLE
-						if (downloadIndex == 1) {
+						// if (downloadIndex == 1) {
 
-							Locator spanNode = card.locator("div.photos_photogallytitlepos__PgJ0k span");
+						// Locator spanNode = card.locator("div.photos_photogallytitlepos__PgJ0k span");
+						Locator captionBox = card.locator("div[class*='photogallytitlepos']");
 
-							caption = spanNode.innerText().trim();
+						if (captionBox.count() == 0)
+							captionBox = card.locator("figcaption");
 
-						} else {
+						if (captionBox.count() == 0)
+							captionBox = card.locator("p");
 
-							Locator firstPara = card.locator("div.photos_photogallytitlepos__PgJ0k span p").first();
+						if (captionBox.count() == 0)
+							captionBox = card.locator("span");
 
-							caption = firstPara.innerText().trim();
-						}
+						caption = captionBox.innerText().trim();
+						// caption = spanNode.innerText().trim();
+
+						caption = getFirstSentence(caption);
+
+						// } else {
+
+						// captionBox = card.locator("div[class*='photos_photogallytitlepos']");
+
+						// String caption = captionBox.innerText().trim();
+						// }
 
 						// FIRST SENTENCE ONLY
 						caption = getFirstSentence(caption);
@@ -206,6 +286,9 @@ public class ytShorts {
 
 						try {
 
+							System.out.println("--------------------------------");
+							System.out.println("IMAGE SRC = " + src);
+							System.out.println("--------------------------------");
 							downloadImageWithPlaywright(page, src, out);
 
 							if (Files.exists(out) && Files.size(out) > 1000) {
@@ -320,6 +403,10 @@ public class ytShorts {
 		try {
 
 			Locator h1Second = page.locator("(//h1)[2]");
+
+			// Locator h1Second = page.locator("h1").first();
+
+			pageTitle = h1Second.innerText().trim();
 
 			if (h1Second.count() > 0) {
 
@@ -948,16 +1035,72 @@ public class ytShorts {
 	}
 
 	// ================= HELPERS =================
-	private static void downloadImageWithPlaywright(Page page, String url, Path out) throws IOException {
-		APIResponse r = page.request().get(url);
-		Files.write(out, r.body());
+	private static void downloadImageWithPlaywright(Page page, String imageUrl, Path out) throws IOException {
+
+		try {
+
+			if (imageUrl == null || imageUrl.isBlank()) {
+				throw new IOException("Empty image URL");
+			}
+
+// convert relative URL
+			if (imageUrl.startsWith("/")) {
+				imageUrl = "https://www.mid-day.com" + imageUrl;
+			}
+
+			System.out.println("Downloading : " + imageUrl);
+
+			APIResponse response = page.request().get(imageUrl);
+
+			System.out.println("HTTP Status : " + response.status());
+
+			if (!response.ok()) {
+				throw new IOException("Image HTTP Status : " + response.status());
+			}
+
+			Files.write(out, response.body());
+
+			System.out.println("Saved : " + out);
+
+		} catch (Exception e) {
+
+			System.out.println("Image Download Failed");
+			e.printStackTrace();
+
+			throw e;
+		}
 	}
+
+//	private static boolean addTextJava2D(Path in, Path out, String text) throws IOException {
+//		text = cleanText(text);
+//
+//		BufferedImage img = ImageIO.read(in.toFile());
 
 	private static boolean addTextJava2D(Path in, Path out, String text) throws IOException {
 
-		text = cleanText(text);
+		System.out.println("------------------------------------");
+		System.out.println("INPUT : " + in);
+		System.out.println("OUTPUT: " + out);
+
+		if (!Files.exists(in)) {
+			System.out.println("INPUT IMAGE DOES NOT EXIST");
+			return false;
+		}
+
+		System.out.println("SIZE : " + Files.size(in));
 
 		BufferedImage img = ImageIO.read(in.toFile());
+
+		if (img == null) {
+			System.out.println("ImageIO returned NULL");
+			return false;
+		}
+
+		System.out.println("WIDTH : " + img.getWidth());
+		System.out.println("HEIGHT: " + img.getHeight());
+
+		text = cleanText(text);
+
 		Graphics2D g = img.createGraphics();
 		g.setFont(new Font("DejaVu Sans", Font.BOLD, FONT_SIZE));
 

@@ -16,6 +16,7 @@ import com.google.api.services.youtube.model.Video;
 import com.google.api.services.youtube.model.VideoSnippet;
 import com.google.api.services.youtube.model.VideoStatus;
 import com.microsoft.playwright.*;
+import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.WaitUntilState;
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import java.time.LocalDate;
@@ -132,9 +133,13 @@ public class ytVideos {
 				// page.navigate(url, new
 				// Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
 				try {
+					// page.navigate(url, new
+					// Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
+					page.navigate(url, new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED)
+							.setTimeout(120000));
 
-					page.navigate(url, new Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED));
-
+					page.waitForLoadState(LoadState.DOMCONTENTLOADED);
+					page.waitForTimeout(3000);
 				} catch (Exception ex) {
 
 					System.out.println("⚠ FAILED TO OPEN URL: " + url);
@@ -188,101 +193,157 @@ public class ytVideos {
 				// List<Locator> images =
 				// page.locator("div.entertainment-background").first().locator("img[alt]").all();
 
-				List<Locator> cards = page.locator("div.photos_cardposition__71WWM").all();
+				// List<Locator> cards =
+				// page.locator("div[class*='photos_cardposition']").all();
+				List<Locator> cards = page.locator("div[class*='photos_photoTimelineItem']").all();
+
+//				Locator cards = page.locator(
+//						"div[class*='photos_cardposition'], " + "div[class*='photoTimelineItem'], " + "article");
+
+//				System.out.println("Cards Found : " + cards.count());
+//				System.out.println("TOTAL CARDS : " + cards.count());
+
+//				if (cards.count() == 0) {
+//
+//					Files.writeString(Paths.get("debug.html"), page.content());
+//
+//					System.out.println("Saved debug.html");
+//
+//					return;
+//				}
+
+				for (int i = 0; i < cards.size(); i++) {
+					Locator card = cards.get(i);
+
+					System.out.println("\n=========================");
+					System.out.println("CARD : " + (i + 1));
+					System.out.println("=========================");
+
+					System.out.println(card.innerHTML());
+
+					System.out.println("=========================");
+				}
 
 				int index = 1;
 
-				for (Locator card : cards) {
-
-					try {
-						Locator img = card.locator("div.main-img img");
-
-						String src = img.getAttribute("src");
-
-						if (card.innerText().contains("ADVERTISEMENT"))
-							continue;
-
-						if (src == null)
-							continue;
-
-						String caption;
-
-						// ✅ FIRST IMAGE → TAKE FULL SPAN TEXT (single line)
-						if (index == 1) {
-							Locator spanNode = card.locator("div.photos_photogallytitlepos__PgJ0k span");
-							caption = spanNode.innerText().trim();
-						} else {
-							Locator firstPara = card.locator("div.photos_photogallytitlepos__PgJ0k span p").first();
-							caption = firstPara.innerText().trim();
-						}
-
-						// ✅ NEW LINE (IMPORTANT)
-						caption = caption.replaceAll("\\s+", " ").trim();
-						caption = getFirstSentence(caption);
-
-						// ✅ REMOVE PHOTO CREDITS
-						caption = caption.replaceAll("\\(Pics?/.*?\\)", "");
-						caption = caption.replaceAll("\\(Images?/.*?\\)", "");
-						caption = caption.replaceAll("\\(Photo[s]?/.*?\\)", "");
-						caption = caption.replaceAll("\\(Pic credit:.*?\\)", "");
-
-						caption = normalizePossessive(caption);
-
-						caption = caption.replaceAll("\\s+", " ").trim();
-
-						System.out.println("[" + index + "] CAPTION: " + caption);
-
-						Path out = downloadDir.resolve(String.format("%s%03d.jpg", IMAGE_PREFIX, index));
-						try {
-							downloadImageWithPlaywright(page, src, out);
-
-							if (Files.exists(out) && Files.size(out) > 1000) {
-								captions.add(caption);
-								index++;
-							} else {
-								System.out.println("⚠ Image failed, skipping caption");
-							}
-
-						} catch (Exception e) {
-							System.out.println("⚠ Download failed, skipping");
-						}
-
-					} catch (Exception e) {
-						System.out.println("⚠️ Skipping broken card...");
-					}
-				}
-
-//				int index = 1;
 //				for (Locator card : cards) {
 //
 //					try {
-//						Locator img = card.locator("div.main-img img");
-//						Locator captionNode = card.locator("div.photos_photogallytitlepos__PgJ0k span p").first();
+//						Locator img = card.locator("img[src], img[data-nimg]");
+//						System.out.println("IMG COUNT = " + img.count());
+//
+//						// String src = img.getAttribute("src");
 //
 //						String src = img.getAttribute("src");
-//						String caption = captionNode.innerText().trim();
+//						System.out.println("SRC = " + src);
+//
+//						if (src != null && src.contains("/_next/image")) {
+//							String real = img.getAttribute("data-src");
+//							if (real == null || real.isBlank())
+//								real = img.getAttribute("data-original");
+//							if (real == null || real.isBlank())
+//								real = img.getAttribute("data-lazy-src");
+//							if (real != null && !real.isBlank())
+//								src = real;
+//						}
 //
 //						if (card.innerText().contains("ADVERTISEMENT"))
 //							continue;
 //
-//						if (src == null || caption.isBlank())
+//						if (src == null)
 //							continue;
 //
+//						String caption;
+//
+//						// ✅ FIRST IMAGE → TAKE FULL SPAN TEXT (single line)
+//						if (index == 1) {
+//							Locator spanNode = card.locator("div[class*='photos_photogallytitlepos']");
+//							caption = spanNode.innerText().trim();
+//						} else {
+//							Locator firstPara = card.locator("div[class*='photos_photogallytitlepos']").first();
+//							caption = firstPara.innerText().trim();
+//						}
+//
+//						// ✅ NEW LINE (IMPORTANT)
+//						caption = caption.replaceAll("\\s+", " ").trim();
+//						caption = getFirstSentence(caption);
+//
+//						// ✅ REMOVE PHOTO CREDITS
+//						caption = caption.replaceAll("\\(Pics?/.*?\\)", "");
+//						caption = caption.replaceAll("\\(Images?/.*?\\)", "");
+//						caption = caption.replaceAll("\\(Photo[s]?/.*?\\)", "");
+//						caption = caption.replaceAll("\\(Pic credit:.*?\\)", "");
+//
 //						caption = normalizePossessive(caption);
+//
 //						caption = caption.replaceAll("\\s+", " ").trim();
 //
 //						System.out.println("[" + index + "] CAPTION: " + caption);
 //
 //						Path out = downloadDir.resolve(String.format("%s%03d.jpg", IMAGE_PREFIX, index));
-//						downloadImageWithPlaywright(page, src, out);
+//						try {
+//							downloadImageWithPlaywright(page, src, out);
 //
-//						captions.add(caption);
-//						index++;
+//							if (Files.exists(out) && Files.size(out) > 1000) {
+//								captions.add(caption);
+//								index++;
+//							} else {
+//								System.out.println("⚠ Image failed, skipping caption");
+//							}
+//
+//						} catch (Exception e) {
+//							System.out.println("⚠ Download failed, skipping");
+//						}
 //
 //					} catch (Exception e) {
 //						System.out.println("⚠️ Skipping broken card...");
 //					}
 //				}
+				
+				for (Locator card : cards) {
+				    try {
+				        // Skip ads
+				        if (card.innerText().contains("ADVERTISEMENT")) continue;
+
+				        // Select the actual photo image (the one with class photos_photogallimgypos__tkRiD)
+				        Locator img = card.locator("img.photos_photogallimgypos__tkRiD");
+				        if (img.count() == 0) {
+				            // fallback: try div.middayWatermark img
+				            img = card.locator("div.middayWatermark img");
+				        }
+				        if (img.count() == 0) {
+				            continue; // no image found
+				        }
+				        String src = img.getAttribute("src");
+				        // It might be absolute, but we can also check if it's relative and construct full URL if needed
+				        if (src == null || src.isBlank()) continue;
+
+				        // Caption
+				        Locator captionLocator = card.locator("div[class*='photos_photogallytitlepos']");
+				        String caption = captionLocator.innerText().trim();
+				        if (caption.isBlank()) continue;
+
+				        // Clean caption as before...
+				        caption = caption.replaceAll("\\s+", " ").trim();
+				        caption = getFirstSentence(caption);
+				        caption = caption.replaceAll("\\(Pics?/.*?\\)", "").replaceAll("\\(Images?/.*?\\)", "")
+				                         .replaceAll("\\(Photo[s]?/.*?\\)", "").replaceAll("\\(Pic credit:.*?\\)", "");
+				        caption = normalizePossessive(caption);
+				        caption = caption.replaceAll("\\s+", " ").trim();
+
+				        // Download image
+				        Path out = downloadDir.resolve(String.format("%s%03d.jpg", IMAGE_PREFIX, index));
+				        downloadImageWithPlaywright(page, src, out);
+
+				        if (Files.exists(out) && Files.size(out) > 1000) {
+				            captions.add(caption);
+				            index++;
+				        }
+				    } catch (Exception e) {
+				        System.out.println("⚠️ Skipping broken card...");
+				        e.printStackTrace(); // optionally print stack trace for debugging
+				    }
+				}
 
 				createTextFile(baseDir, pageTitle, captions);
 				browser.close();
@@ -320,13 +381,33 @@ public class ytVideos {
 
 					Path output = finalDir.resolve(String.format("%s%03d.jpg", IMAGE_PREFIX, videoIndex));
 
-					if (addTextJava2D(input, output, captions.get(i))) {
+//					if (addTextJava2D(input, output, captions.get(i))) {
+//						videoIndex++;
+//					}
+
+					boolean ok = addTextJava2D(input, output, captions.get(i));
+
+					System.out.println("Overlay : " + input.getFileName() + " -> " + output.getFileName() + " = " + ok);
+
+					if (ok)
 						videoIndex++;
-					}
 				}
 
 				// ================= VIDEO + TTS =================
 				List<Path> finalImages = Files.list(finalDir).sorted().collect(Collectors.toList());
+
+				System.out.println();
+				System.out.println("================================");
+				System.out.println("Downloaded Images : " + downloadedImages.size());
+				System.out.println("Captions          : " + captions.size());
+				System.out.println("Final Images      : " + finalImages.size());
+				System.out.println("================================");
+
+				System.out.println("Downloaded = " + downloadedImages.size());
+				System.out.println("JPG Images = " + jpgImages.size());
+				System.out.println("Captions = " + captions.size());
+
+				Files.list(finalDir).forEach(p -> System.out.println("FINAL : " + p.getFileName()));
 
 				Path concatListFile = baseDir.resolve("concat_list.txt");
 
