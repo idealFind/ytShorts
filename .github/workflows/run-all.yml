@@ -8,7 +8,7 @@ on:
 jobs:
 
   workflow1:
-    uses: ./.github/workflows/url_Shorts.yml
+    uses: ./.github/workflows/url_shorts.yml
 
   workflow2:
     needs: workflow1
