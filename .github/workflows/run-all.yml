@@ -7,13 +7,13 @@ on:
 
 jobs:
 
-  workflow1:
+  url_shorts:
     uses: ./.github/workflows/url_shorts.yml
 
-  workflow2:
-    needs: workflow1
+  shorts:
+    needs: url_shorts
     uses: ./.github/workflows/shorts.yml
 
-  workflow3:
-    needs: workflow2
+  videos:
+    needs: shorts
     uses: ./.github/workflows/videos.yml
