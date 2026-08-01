@@ -1,0 +1,16 @@
+name: RunShortsVideo
+
+permissions:
+  contents: write
+
+on:
+  schedule:
+    - cron: '37 9 * * *'
+  workflow_dispatch:
+
+jobs:
+   shorts:
+    uses: "./.github/workflows/shorts.yml"
+   videos:
+    uses: "./.github/workflows/videos.yml"
+    
