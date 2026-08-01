@@ -1,2 +1,12 @@
 time,status,project,sourceUrl,videoId,videoUrl,error
 "15:36 | 28 Jul 2026","SUCCESS","project7","","iCCX86ocia4","https://youtube.com/watch?v=iCCX86ocia4",""
+"11:43 | 01 Aug 2026","FAILED","project7","","","","authenticatedUserAccountSuspended"
+"11:43 | 01 Aug 2026","FAILED","project8","","","","authenticatedUserAccountSuspended"
+"11:43 | 01 Aug 2026","FAILED","project9","","","","authenticatedUserAccountSuspended"
+"11:43 | 01 Aug 2026","FAILED","project1","","","","authenticatedUserAccountSuspended"
+"11:43 | 01 Aug 2026","FAILED","project10","","","","authenticatedUserAccountSuspended"
+"11:43 | 01 Aug 2026","FAILED","project2","","","","authenticatedUserAccountSuspended"
+"11:43 | 01 Aug 2026","FAILED","project3","","","","authenticatedUserAccountSuspended"
+"11:43 | 01 Aug 2026","FAILED","project4","","","","authenticatedUserAccountSuspended"
+"11:43 | 01 Aug 2026","FAILED","project5","","","","authenticatedUserAccountSuspended"
+"11:43 | 01 Aug 2026","FAILED","project6","","","","authenticatedUserAccountSuspended"
